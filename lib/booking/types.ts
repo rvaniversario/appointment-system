@@ -1,15 +1,3 @@
-export type ScreenId =
-  | "portal-login"
-  | "portal-2fa"
-  | "portal"
-  | "admin-login"
-  | "admin-2fa"
-  | "admin"
-  | "settings";
-
-/** Valid entry points into the `/book` bridge route (see app/book/page.tsx). */
-export type BookEntryScreen = "portal-login" | "admin-login";
-
 /** Steps of the booking wizard at app/book/[attorneyId]/<step>. */
 export type WizardStepId =
   | "time"
@@ -105,14 +93,13 @@ export interface PortalInvoice {
   status: "due" | "paid";
 }
 
-export type PortalTab = "appointments" | "messages" | "documents" | "billing";
+export type PortalTab = "appointments" | "messages" | "documents";
 
 export interface PortalState {
   loginEmail: string;
   loginPassword: string;
   code: string;
   loggedIn: boolean;
-  tab: PortalTab;
   appointments: PortalAppointment[];
   rescheduleId: number | null;
   rescheduleDateIndex: number | null;
@@ -121,6 +108,8 @@ export interface PortalState {
   messageDraft: string;
   documents: PortalDocument[];
   invoices: PortalInvoice[];
+  settings: SettingsState;
+  errors: ErrorState;
 }
 
 export type AdminRole = "attorney" | "partner";
@@ -141,10 +130,12 @@ export interface AdminState {
   loginEmail: string;
   loginPassword: string;
   code: string;
+  loggedIn: boolean;
   role: AdminRole;
-  tab: AdminTab;
   conflictSearch: string;
   queue: QueueLead[];
+  settings: SettingsState;
+  errors: ErrorState;
 }
 
 export type SettingsTab = "profile" | "billing";
@@ -177,18 +168,6 @@ export type ErrorKey =
   | "settingsPassword";
 
 export type ErrorState = Partial<Record<ErrorKey, boolean>>;
-
-export interface BookingState {
-  screen: ScreenId;
-  errors: ErrorState;
-  userMenuOpen: boolean;
-  settingsPrevScreen: ScreenId | null;
-  settingsSaved: boolean;
-  settingsTab: SettingsTab;
-  settings: SettingsState;
-  portal: PortalState;
-  admin: AdminState;
-}
 
 /** State for the booking wizard at app/book/[attorneyId]/<step>, held in BookingWizardProvider. */
 export interface WizardState {

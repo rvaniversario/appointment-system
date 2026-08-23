@@ -1,76 +1,73 @@
 import { PRACTICE_AREAS } from "./data";
-import type { BookEntryScreen, BookingState, WizardState } from "./types";
+import type { AdminState, PortalState, SettingsState, WizardState } from "./types";
 
-export interface InitialStateOverrides {
-  screen: BookEntryScreen;
+function createInitialSettings(): SettingsState {
+  return {
+    photo: null,
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    dob: "",
+    email: "",
+    mobile: "",
+    password: "",
+    confirmPassword: "",
+  };
 }
 
-export function createInitialState(overrides: InitialStateOverrides): BookingState {
+export function createInitialPortalState(): PortalState {
   return {
-    screen: overrides.screen,
+    loginEmail: "",
+    loginPassword: "",
+    code: "",
+    loggedIn: false,
+    appointments: [
+      {
+        id: 1,
+        attorneyId: "ramirez",
+        dateLabel: "Fri, Aug 14",
+        dateIndex: null,
+        time: "1:00 PM",
+        type: "30-min Video Consultation",
+        status: "upcoming",
+      },
+    ],
+    rescheduleId: null,
+    rescheduleDateIndex: null,
+    rescheduleTime: null,
+    messages: [
+      {
+        from: "attorney",
+        text: "Thanks for your intake — looking forward to our consultation on Aug 14.",
+      },
+      { from: "client", text: "Thank you, see you then!" },
+    ],
+    messageDraft: "",
+    documents: [{ name: "Passport copy.pdf" }, { name: "Lease agreement.pdf" }],
+    invoices: [
+      { id: 1, desc: "30-min Video Consultation", amount: "$150", date: "Aug 14, 2026", status: "due" },
+      { id: 2, desc: "Retainer deposit", amount: "$1,000", date: "Jul 2, 2026", status: "paid" },
+    ],
+    settings: createInitialSettings(),
     errors: {},
-    userMenuOpen: false,
-    settingsPrevScreen: null,
-    settingsSaved: false,
-    settingsTab: "profile",
-    settings: {
-      photo: null,
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      dob: "",
-      email: "",
-      mobile: "",
-      password: "",
-      confirmPassword: "",
-    },
-    portal: {
-      loginEmail: "",
-      loginPassword: "",
-      code: "",
-      loggedIn: false,
-      tab: "appointments",
-      appointments: [
-        {
-          id: 1,
-          attorneyId: "ramirez",
-          dateLabel: "Fri, Aug 14",
-          dateIndex: null,
-          time: "1:00 PM",
-          type: "30-min Video Consultation",
-          status: "upcoming",
-        },
-      ],
-      rescheduleId: null,
-      rescheduleDateIndex: null,
-      rescheduleTime: null,
-      messages: [
-        {
-          from: "attorney",
-          text: "Thanks for your intake — looking forward to our consultation on Aug 14.",
-        },
-        { from: "client", text: "Thank you, see you then!" },
-      ],
-      messageDraft: "",
-      documents: [{ name: "Passport copy.pdf" }, { name: "Lease agreement.pdf" }],
-      invoices: [
-        { id: 1, desc: "30-min Video Consultation", amount: "$150", date: "Aug 14, 2026", status: "due" },
-        { id: 2, desc: "Retainer deposit", amount: "$1,000", date: "Jul 2, 2026", status: "paid" },
-      ],
-    },
-    admin: {
-      loginEmail: "",
-      loginPassword: "",
-      code: "",
-      role: "partner",
-      tab: "calendar",
-      conflictSearch: "",
-      queue: [
-        { id: 1, name: "Jordan Blake", caseType: "Family Law", urgency: "urgent", attorneyId: "chen", conflict: false, status: "pending", reassignTo: "" },
-        { id: 2, name: "Amara Smith", caseType: "Business Law", urgency: "standard", attorneyId: "whitfield", conflict: true, status: "pending", reassignTo: "" },
-        { id: 3, name: "Luis Herrera", caseType: "Immigration", urgency: "standard", attorneyId: "ramirez", conflict: false, status: "approved", reassignTo: "" },
-      ],
-    },
+  };
+}
+
+export function createInitialAdminState(): AdminState {
+  return {
+    loginEmail: "",
+    loginPassword: "",
+    code: "",
+    loggedIn: false,
+    role: "partner",
+    conflictSearch: "",
+    queue: [
+      { id: 1, name: "Jordan Blake", caseType: "Family Law", urgency: "urgent", attorneyId: "chen", conflict: false, status: "pending", reassignTo: "" },
+      { id: 2, name: "Amara Smith", caseType: "Business Law", urgency: "standard", attorneyId: "whitfield", conflict: true, status: "pending", reassignTo: "" },
+      { id: 3, name: "Luis Herrera", caseType: "Immigration", urgency: "standard", attorneyId: "ramirez", conflict: false, status: "approved", reassignTo: "" },
+    ],
+    settings: createInitialSettings(),
+    errors: {},
   };
 }
 

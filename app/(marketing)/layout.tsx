@@ -16,10 +16,10 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         userMenuOpen={false}
         onToggleUserMenu={() => {}}
         showBackLink
-        onOpenPortal={() => router.push("/book?screen=portal-login")}
+        onOpenPortal={() => router.push("/portal/login")}
       />
       <main style={{ flex: 1, width: "100%" }}>{children}</main>
-      <Footer onOpenAdmin={() => router.push("/book?screen=admin-login")} />
+      <Footer onOpenAdmin={() => router.push("/staff/login")} />
     </>
   );
 }

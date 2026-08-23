@@ -52,10 +52,10 @@ export function WizardChrome({ children }: { children: ReactNode }) {
         userMenuOpen={false}
         onToggleUserMenu={() => {}}
         showBackLink={currentStep === "video"}
-        onOpenPortal={() => router.push("/book?screen=portal-login")}
+        onOpenPortal={() => router.push("/portal/login")}
       />
       <main style={{ flex: 1, width: "100%" }}>{children}</main>
-      <Footer onOpenAdmin={() => router.push("/book?screen=admin-login")} />
+      <Footer onOpenAdmin={() => router.push("/staff/login")} />
     </div>
   );
 }
