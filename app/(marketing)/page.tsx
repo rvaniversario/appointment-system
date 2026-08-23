@@ -1,14 +1,9 @@
-"use client";
+import Link from "next/link";
+import { PRACTICE_AREAS, getFirstAvailable } from "@/lib/booking/data";
 
-import { PRACTICE_AREAS } from "@/lib/booking/data";
+export default function Home() {
+  const firstAvailable = getFirstAvailable();
 
-interface HomeScreenProps {
-  onGoDirectory: () => void;
-  onFirstAvailable: () => void;
-  onPracticeArea: (pa: string) => void;
-}
-
-export function HomeScreen({ onGoDirectory, onFirstAvailable, onPracticeArea }: HomeScreenProps) {
   return (
     <div style={{ maxWidth: 1120, margin: "0 auto", padding: "64px 32px 90px" }}>
       <div style={{ maxWidth: 680, marginBottom: 44 }}>
@@ -31,14 +26,17 @@ export function HomeScreen({ onGoDirectory, onFirstAvailable, onPracticeArea }: 
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 56 }}>
-        <div
-          onClick={onGoDirectory}
+        <Link
+          href="/attorneys"
           style={{
+            display: "block",
             background: "#fff",
             border: "1px solid oklch(0.9 0.005 90)",
             borderRadius: 14,
             padding: "28px 26px",
             cursor: "pointer",
+            color: "inherit",
+            textDecoration: "none",
           }}
         >
           <div
@@ -66,15 +64,18 @@ export function HomeScreen({ onGoDirectory, onFirstAvailable, onPracticeArea }: 
           <div style={{ fontSize: 14, fontWeight: 600, color: "oklch(0.5 0.08 150)" }}>
             Browse attorneys →
           </div>
-        </div>
+        </Link>
 
-        <div
-          onClick={onFirstAvailable}
+        <Link
+          href={firstAvailable ? `/book?attorney=${firstAvailable.attorneyId}` : "/attorneys"}
           style={{
+            display: "block",
             background: "oklch(0.28 0.05 258)",
             borderRadius: 14,
             padding: "28px 26px",
             cursor: "pointer",
+            color: "inherit",
+            textDecoration: "none",
           }}
         >
           <div
@@ -102,7 +103,7 @@ export function HomeScreen({ onGoDirectory, onFirstAvailable, onPracticeArea }: 
           <div style={{ fontSize: 14, fontWeight: 600, color: "oklch(0.85 0.09 85)" }}>
             Get matched now →
           </div>
-        </div>
+        </Link>
       </div>
 
       <div
@@ -117,9 +118,9 @@ export function HomeScreen({ onGoDirectory, onFirstAvailable, onPracticeArea }: 
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
         {PRACTICE_AREAS.map((pa) => (
-          <button
+          <Link
             key={pa}
-            onClick={() => onPracticeArea(pa)}
+            href={`/attorneys?practiceArea=${encodeURIComponent(pa)}`}
             style={{
               padding: "10px 18px",
               border: "1px solid oklch(0.85 0.005 90)",
@@ -129,10 +130,11 @@ export function HomeScreen({ onGoDirectory, onFirstAvailable, onPracticeArea }: 
               fontWeight: 600,
               color: "oklch(0.32 0.01 258)",
               cursor: "pointer",
+              textDecoration: "none",
             }}
           >
             {pa}
-          </button>
+          </Link>
         ))}
       </div>
     </div>

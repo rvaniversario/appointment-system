@@ -1,7 +1,4 @@
 export type ScreenId =
-  | "home"
-  | "directory"
-  | "profile"
   | "time"
   | "intake"
   | "documents"
@@ -16,6 +13,9 @@ export type ScreenId =
   | "admin-2fa"
   | "admin"
   | "settings";
+
+/** Valid entry points into the `/book` bridge route (see app/book/page.tsx). */
+export type BookEntryScreen = "time" | "portal-login" | "admin-login";
 
 export interface Attorney {
   id: string;

@@ -136,6 +136,32 @@ export function getNext7Days(): DayInfo[] {
   return days;
 }
 
+export interface AttorneyFilters {
+  practiceArea?: string;
+  language?: string;
+  location?: string;
+}
+
+export function filterAttorneys(filters: AttorneyFilters): Attorney[] {
+  return ATTORNEYS.filter(
+    (a) =>
+      (!filters.practiceArea || a.practiceAreas.includes(filters.practiceArea)) &&
+      (!filters.language || a.languages.includes(filters.language)) &&
+      (!filters.location || a.location === filters.location)
+  );
+}
+
+export function getFirstAvailable(): { attorneyId: string; dateIndex: number } | null {
+  for (const a of ATTORNEYS) {
+    for (let d = 0; d < 7; d++) {
+      if (a.avail[d] && a.avail[d].length) {
+        return { attorneyId: a.id, dateIndex: d };
+      }
+    }
+  }
+  return null;
+}
+
 export function getAttorney(id: string | null): Attorney | undefined {
   if (!id) return undefined;
   return ATTORNEYS.find((a) => a.id === id);

@@ -1,23 +1,33 @@
-"use client";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ATTORNEYS, getAttorney } from "@/lib/booking/data";
 
-import type { Attorney } from "@/lib/booking/types";
-import { linkButton } from "@/lib/booking/ui";
-
-interface ProfileScreenProps {
-  attorney: Attorney;
-  onBack: () => void;
-  onBook: () => void;
+export function generateStaticParams() {
+  return ATTORNEYS.map((a) => ({ attorneyId: a.id }));
 }
 
-export function ProfileScreen({ attorney, onBack, onBook }: ProfileScreenProps) {
+export default async function AttorneyProfilePage(props: PageProps<"/attorneys/[attorneyId]">) {
+  const { attorneyId } = await props.params;
+  const attorney = getAttorney(attorneyId);
+  if (!attorney) notFound();
+
   return (
     <div style={{ maxWidth: 1120, margin: "0 auto", padding: "32px 32px 80px" }}>
-      <button
-        onClick={onBack}
-        style={{ ...linkButton, padding: "0 0 20px", display: "block" }}
+      <Link
+        href="/attorneys"
+        style={{
+          border: "none",
+          background: "none",
+          color: "oklch(0.5 0.08 150)",
+          fontSize: 14,
+          fontWeight: 600,
+          padding: "0 0 20px",
+          display: "block",
+          textDecoration: "none",
+        }}
       >
         ← Back to attorneys
-      </button>
+      </Link>
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 36 }}>
         <div>
           <div
@@ -45,9 +55,11 @@ export function ProfileScreen({ attorney, onBack, onBook }: ProfileScreenProps) 
               attorney photo
             </span>
           </div>
-          <button
-            onClick={onBook}
+          <Link
+            href={`/book?attorney=${attorney.id}`}
             style={{
+              display: "block",
+              textAlign: "center",
               width: "100%",
               padding: "13px 0",
               border: "none",
@@ -57,10 +69,12 @@ export function ProfileScreen({ attorney, onBack, onBook }: ProfileScreenProps) 
               fontSize: 15,
               fontWeight: 600,
               cursor: "pointer",
+              textDecoration: "none",
+              boxSizing: "border-box",
             }}
           >
             Book appointment
-          </button>
+          </Link>
         </div>
         <div>
           <h1

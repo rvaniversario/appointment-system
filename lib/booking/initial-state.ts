@@ -1,11 +1,16 @@
 import { PRACTICE_AREAS } from "./data";
-import type { BookingState } from "./types";
+import type { BookEntryScreen, BookingState } from "./types";
 
-export function createInitialState(): BookingState {
+export interface InitialStateOverrides {
+  screen: BookEntryScreen;
+  selectedAttorneyId?: string | null;
+}
+
+export function createInitialState(overrides: InitialStateOverrides): BookingState {
   return {
-    screen: "home",
+    screen: overrides.screen,
     filters: { practiceArea: "", language: "", location: "" },
-    selectedAttorneyId: null,
+    selectedAttorneyId: overrides.selectedAttorneyId ?? null,
     booking: { consultType: "", dateIndex: null, time: null },
     intake: {
       firstName: "",

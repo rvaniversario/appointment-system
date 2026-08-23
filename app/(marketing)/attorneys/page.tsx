@@ -1,41 +1,20 @@
-"use client";
+import Link from "next/link";
+import { filterAttorneys } from "@/lib/booking/data";
+import { DirectoryFilters } from "@/components/booking/directory-filters";
 
-import { LANGUAGES, LOCATIONS, PRACTICE_AREAS } from "@/lib/booking/data";
-import type { Attorney } from "@/lib/booking/types";
-
-interface DirectoryFilters {
-  practiceArea: string;
-  language: string;
-  location: string;
+function firstParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
 }
 
-interface DirectoryScreenProps {
-  filters: DirectoryFilters;
-  onFilterChange: (patch: Partial<DirectoryFilters>) => void;
-  onResetFilters: () => void;
-  onFirstAvailable: () => void;
-  attorneys: Attorney[];
-  onView: (id: string) => void;
-  onBook: (id: string) => void;
-}
+export default async function AttorneysPage(props: PageProps<"/attorneys">) {
+  const searchParams = await props.searchParams;
+  const practiceArea = firstParam(searchParams.practiceArea);
+  const language = firstParam(searchParams.language);
+  const location = firstParam(searchParams.location);
 
-const selectStyle = {
-  padding: "9px 10px",
-  border: "1px solid oklch(0.85 0.005 90)",
-  borderRadius: 7,
-  fontSize: 14,
-  background: "#fff",
-} as const;
+  const attorneys = filterAttorneys({ practiceArea, language, location });
 
-export function DirectoryScreen({
-  filters,
-  onFilterChange,
-  onResetFilters,
-  onFirstAvailable,
-  attorneys,
-  onView,
-  onBook,
-}: DirectoryScreenProps) {
   return (
     <div style={{ maxWidth: 1120, margin: "0 auto", padding: "40px 32px 80px" }}>
       <div style={{ maxWidth: 640, marginBottom: 32 }}>
@@ -57,102 +36,7 @@ export function DirectoryScreen({
         </p>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          flexWrap: "wrap",
-          alignItems: "flex-end",
-          background: "#fff",
-          border: "1px solid oklch(0.9 0.005 90)",
-          borderRadius: 12,
-          padding: "20px 24px",
-          marginBottom: 12,
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 170 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>
-            Practice area
-          </label>
-          <select
-            value={filters.practiceArea}
-            onChange={(e) => onFilterChange({ practiceArea: e.target.value })}
-            style={selectStyle}
-          >
-            <option value="">Any practice area</option>
-            {PRACTICE_AREAS.map((pa) => (
-              <option key={pa} value={pa}>
-                {pa}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 150 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>
-            Language
-          </label>
-          <select
-            value={filters.language}
-            onChange={(e) => onFilterChange({ language: e.target.value })}
-            style={selectStyle}
-          >
-            <option value="">Any language</option>
-            {LANGUAGES.map((lang) => (
-              <option key={lang} value={lang}>
-                {lang}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 170 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>
-            Office
-          </label>
-          <select
-            value={filters.location}
-            onChange={(e) => onFilterChange({ location: e.target.value })}
-            style={selectStyle}
-          >
-            <option value="">Any location</option>
-            {LOCATIONS.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          onClick={onResetFilters}
-          style={{
-            padding: "9px 14px",
-            border: "1px solid oklch(0.85 0.005 90)",
-            borderRadius: 7,
-            background: "#fff",
-            fontSize: 14,
-            color: "oklch(0.45 0.01 258)",
-            cursor: "pointer",
-          }}
-        >
-          Clear filters
-        </button>
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={onFirstAvailable}
-          style={{
-            padding: "11px 18px",
-            border: "none",
-            borderRadius: 7,
-            background: "oklch(0.28 0.05 258)",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-        >
-          In a hurry? First available →
-        </button>
-      </div>
+      <DirectoryFilters practiceArea={practiceArea} language={language} location={location} />
 
       <div style={{ fontSize: 13, color: "oklch(0.55 0.01 258)", marginBottom: 20 }}>
         {attorneys.length} {attorneys.length === 1 ? "attorney matches" : "attorneys match"} your
@@ -247,8 +131,8 @@ export function DirectoryScreen({
               </div>
               <div style={{ flex: 1 }} />
               <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-                <button
-                  onClick={() => onView(a.id)}
+                <Link
+                  href={`/attorneys/${a.id}`}
                   style={{
                     flex: 1,
                     padding: "9px 0",
@@ -259,12 +143,14 @@ export function DirectoryScreen({
                     fontWeight: 600,
                     color: "oklch(0.28 0.05 258)",
                     cursor: "pointer",
+                    textAlign: "center",
+                    textDecoration: "none",
                   }}
                 >
                   View profile
-                </button>
-                <button
-                  onClick={() => onBook(a.id)}
+                </Link>
+                <Link
+                  href={`/book?attorney=${a.id}`}
                   style={{
                     flex: 1,
                     padding: "9px 0",
@@ -275,10 +161,12 @@ export function DirectoryScreen({
                     fontSize: 13.5,
                     fontWeight: 600,
                     cursor: "pointer",
+                    textAlign: "center",
+                    textDecoration: "none",
                   }}
                 >
                   Book
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -290,19 +178,22 @@ export function DirectoryScreen({
           <div style={{ fontSize: 16, marginBottom: 8 }}>
             No attorneys match those filters right now.
           </div>
-          <button
-            onClick={onResetFilters}
+          <Link
+            href="/attorneys"
             style={{
+              display: "inline-block",
               padding: "9px 16px",
               border: "1px solid oklch(0.85 0.005 90)",
               borderRadius: 7,
               background: "#fff",
               fontSize: 14,
               cursor: "pointer",
+              textDecoration: "none",
+              color: "oklch(0.32 0.01 258)",
             }}
           >
             Clear filters
-          </button>
+          </Link>
         </div>
       )}
     </div>

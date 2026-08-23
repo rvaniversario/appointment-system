@@ -28,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body
         className="min-h-full flex flex-col font-sans"
-        style={{ background: "oklch(0.985 0.004 90)" }}
+        style={{ background: "oklch(0.985 0.004 90)", color: "oklch(0.32 0.01 258)" }}
       >
         {children}
       </body>
