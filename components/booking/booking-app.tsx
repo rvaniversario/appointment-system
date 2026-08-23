@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  ATTORNEYS,
   CONSULT_TYPES,
-  PRACTICE_AREAS,
   getAttorney,
   getNext7Days,
   initialsOf,
@@ -15,6 +14,7 @@ import type {
   AdminTab,
   AgreementState,
   Attorney,
+  BookEntryScreen,
   BookingState,
   IntakeState,
   PaymentState,
@@ -25,9 +25,6 @@ import type {
 } from "@/lib/booking/types";
 import { Header, type StepperItem, type UserMenuData } from "./header";
 import { Footer } from "./footer";
-import { HomeScreen } from "./screens/home-screen";
-import { DirectoryScreen } from "./screens/directory-screen";
-import { ProfileScreen } from "./screens/profile-screen";
 import { BookTimeScreen } from "./screens/book-time-screen";
 import { BookIntakeScreen } from "./screens/book-intake-screen";
 import { BookDocumentsScreen } from "./screens/book-documents-screen";
@@ -56,50 +53,23 @@ const PLACEHOLDER_ATTORNEY: Attorney = {
   avail: [],
 };
 
-export function BookingApp() {
-  const [state, setState] = useState<BookingState>(createInitialState);
+interface BookingAppProps {
+  initialScreen: BookEntryScreen;
+  initialAttorneyId?: string | null;
+}
+
+export function BookingApp({ initialScreen, initialAttorneyId = null }: BookingAppProps) {
+  const router = useRouter();
+  const [state, setState] = useState<BookingState>(() =>
+    createInitialState({ screen: initialScreen, selectedAttorneyId: initialAttorneyId })
+  );
 
   const days = getNext7Days();
   const screen = state.screen;
   const attorney = getAttorney(state.selectedAttorneyId) ?? PLACEHOLDER_ATTORNEY;
 
   // ---- navigation & simple setters ----
-  const goHome = () => setState((s) => ({ ...s, screen: "home" }));
-  const goDirectory = () => setState((s) => ({ ...s, screen: "directory" }));
-  const goToPracticeArea = (pa: string) =>
-    setState((s) => ({ ...s, screen: "directory", filters: { ...s.filters, practiceArea: pa } }));
-  const selectAttorney = (id: string, target: ScreenId) =>
-    setState((s) => ({ ...s, screen: target, selectedAttorneyId: id }));
-  const bookSelected = () => setState((s) => ({ ...s, screen: "time" }));
-
-  const onFilterChange = (patch: Partial<BookingState["filters"]>) =>
-    setState((s) => ({ ...s, filters: { ...s.filters, ...patch } }));
-  const resetFilters = () =>
-    setState((s) => ({ ...s, filters: { practiceArea: "", language: "", location: "" } }));
-
-  const getFilteredAttorneys = () =>
-    ATTORNEYS.filter(
-      (a) =>
-        (!state.filters.practiceArea || a.practiceAreas.includes(state.filters.practiceArea)) &&
-        (!state.filters.language || a.languages.includes(state.filters.language)) &&
-        (!state.filters.location || a.location === state.filters.location)
-    );
-
-  const firstAvailable = () => {
-    for (const a of ATTORNEYS) {
-      for (let d = 0; d < 7; d++) {
-        if (a.avail[d] && a.avail[d].length) {
-          setState((s) => ({
-            ...s,
-            selectedAttorneyId: a.id,
-            screen: "time",
-            booking: { consultType: "", dateIndex: d, time: null },
-          }));
-          return;
-        }
-      }
-    }
-  };
+  const goHome = () => router.push("/");
 
   const setConsultType = (id: string) =>
     setState((s) => ({ ...s, booking: { ...s.booking, consultType: id } }));
@@ -126,8 +96,7 @@ export function BookingApp() {
       return { ...s, errors: {}, conflictFlagged: flagged, screen: flagged ? "intake" : "documents" };
     });
 
-  const backToDirectoryFromConflict = () =>
-    setState((s) => ({ ...s, screen: "directory", conflictFlagged: false, selectedAttorneyId: null }));
+  const backToDirectoryFromConflict = () => router.push("/attorneys");
 
   const addDemoDocument = () =>
     setState((s) => ({ ...s, documents: [...s.documents, `Document ${s.documents.length + 1}.pdf`] }));
@@ -172,31 +141,7 @@ export function BookingApp() {
       return s;
     });
 
-  const restart = () =>
-    setState((s) => ({
-      ...s,
-      screen: "directory",
-      selectedAttorneyId: null,
-      conflictFlagged: false,
-      documents: [],
-      booking: { consultType: "", dateIndex: null, time: null },
-      intake: {
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        caseType: PRACTICE_AREAS[0],
-        urgency: "standard",
-        details: "",
-        opposingParty: "",
-        ack: false,
-      },
-      agreement: { agreed: false, signature: "" },
-      payment: { cardName: "", cardNumber: "", cardExpiry: "", cardCvc: "" },
-      errors: {},
-      cameraOk: false,
-      micOk: false,
-    }));
+  const restart = () => router.push("/attorneys");
 
   // ---- portal / user menu / settings ----
   const openPortal = () => setState((s) => ({ ...s, screen: "portal-login" }));
@@ -217,7 +162,13 @@ export function BookingApp() {
         mobile: s.settings.mobile || "",
       },
     }));
-  const goBackFromSettings = () => setState((s) => ({ ...s, screen: s.settingsPrevScreen || "home" }));
+  const goBackFromSettings = () => {
+    if (state.settingsPrevScreen) {
+      setState((s) => ({ ...s, screen: s.settingsPrevScreen! }));
+    } else {
+      router.push("/");
+    }
+  };
   const setSettingsTab = (tab: SettingsTab) => setState((s) => ({ ...s, settingsTab: tab }));
   const onSettingsFieldChange = (patch: Partial<SettingsState>) =>
     setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
@@ -236,13 +187,7 @@ export function BookingApp() {
       };
     });
 
-  const portalLogout = () =>
-    setState((s) => ({
-      ...s,
-      screen: "home",
-      userMenuOpen: false,
-      portal: { ...s.portal, loggedIn: false, loginPassword: "", code: "" },
-    }));
+  const portalLogout = () => router.push("/");
   const onPortalLoginEmail = (v: string) =>
     setState((s) => ({ ...s, portal: { ...s.portal, loginEmail: v } }));
   const onPortalLoginPassword = (v: string) =>
@@ -257,7 +202,7 @@ export function BookingApp() {
   const submitPortal2fa = () =>
     setState((s) => {
       if (!s.portal.code.trim()) return { ...s, errors: { portal2fa: true } };
-      return { ...s, errors: {}, screen: "home", portal: { ...s.portal, loggedIn: true } };
+      return { ...s, errors: {}, screen: "portal", portal: { ...s.portal, loggedIn: true } };
     });
   const goToPortalTab = (tab: PortalTab) =>
     setState((s) => ({ ...s, screen: "portal", userMenuOpen: false, portal: { ...s.portal, tab } }));
@@ -357,13 +302,7 @@ export function BookingApp() {
       if (!s.admin.code.trim()) return { ...s, errors: { admin2fa: true } };
       return { ...s, errors: {}, screen: "admin", admin: { ...s.admin, tab: "calendar" } };
     });
-  const adminLogout = () =>
-    setState((s) => ({
-      ...s,
-      screen: "home",
-      userMenuOpen: false,
-      admin: { ...s.admin, loginPassword: "", code: "" },
-    }));
+  const adminLogout = () => router.push("/");
   const onAdminRoleChange = (role: AdminRole) =>
     setState((s) => {
       const allowed: AdminTab[] =
@@ -505,28 +444,6 @@ export function BookingApp() {
       />
 
       <main style={{ flex: 1, width: "100%" }}>
-        {screen === "home" && (
-          <HomeScreen
-            onGoDirectory={goDirectory}
-            onFirstAvailable={firstAvailable}
-            onPracticeArea={goToPracticeArea}
-          />
-        )}
-
-        {screen === "directory" && (
-          <DirectoryScreen
-            filters={state.filters}
-            onFilterChange={onFilterChange}
-            onResetFilters={resetFilters}
-            onFirstAvailable={firstAvailable}
-            attorneys={getFilteredAttorneys()}
-            onView={(id) => selectAttorney(id, "profile")}
-            onBook={(id) => selectAttorney(id, "time")}
-          />
-        )}
-
-        {screen === "profile" && <ProfileScreen attorney={attorney} onBack={goDirectory} onBook={bookSelected} />}
-
         {screen === "time" && (
           <BookTimeScreen
             attorney={attorney}
