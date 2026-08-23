@@ -1,11 +1,4 @@
 export type ScreenId =
-  | "time"
-  | "intake"
-  | "documents"
-  | "agreement"
-  | "payment"
-  | "video"
-  | "confirmation"
   | "portal-login"
   | "portal-2fa"
   | "portal"
@@ -15,7 +8,17 @@ export type ScreenId =
   | "settings";
 
 /** Valid entry points into the `/book` bridge route (see app/book/page.tsx). */
-export type BookEntryScreen = "time" | "portal-login" | "admin-login";
+export type BookEntryScreen = "portal-login" | "admin-login";
+
+/** Steps of the booking wizard at app/book/[attorneyId]/<step>. */
+export type WizardStepId =
+  | "time"
+  | "intake"
+  | "documents"
+  | "agreement"
+  | "payment"
+  | "video"
+  | "confirmation";
 
 export interface Attorney {
   id: string;
@@ -177,8 +180,18 @@ export type ErrorState = Partial<Record<ErrorKey, boolean>>;
 
 export interface BookingState {
   screen: ScreenId;
-  filters: { practiceArea: string; language: string; location: string };
-  selectedAttorneyId: string | null;
+  errors: ErrorState;
+  userMenuOpen: boolean;
+  settingsPrevScreen: ScreenId | null;
+  settingsSaved: boolean;
+  settingsTab: SettingsTab;
+  settings: SettingsState;
+  portal: PortalState;
+  admin: AdminState;
+}
+
+/** State for the booking wizard at app/book/[attorneyId]/<step>, held in BookingWizardProvider. */
+export interface WizardState {
   booking: BookingSelection;
   intake: IntakeState;
   conflictFlagged: boolean;
@@ -188,13 +201,6 @@ export interface BookingState {
   errors: ErrorState;
   cameraOk: boolean;
   micOk: boolean;
-  userMenuOpen: boolean;
-  settingsPrevScreen: ScreenId | null;
-  settingsSaved: boolean;
-  settingsTab: SettingsTab;
-  settings: SettingsState;
-  portal: PortalState;
-  admin: AdminState;
 }
 
 export interface DayInfo {

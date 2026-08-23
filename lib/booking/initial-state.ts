@@ -1,35 +1,14 @@
 import { PRACTICE_AREAS } from "./data";
-import type { BookEntryScreen, BookingState } from "./types";
+import type { BookEntryScreen, BookingState, WizardState } from "./types";
 
 export interface InitialStateOverrides {
   screen: BookEntryScreen;
-  selectedAttorneyId?: string | null;
 }
 
 export function createInitialState(overrides: InitialStateOverrides): BookingState {
   return {
     screen: overrides.screen,
-    filters: { practiceArea: "", language: "", location: "" },
-    selectedAttorneyId: overrides.selectedAttorneyId ?? null,
-    booking: { consultType: "", dateIndex: null, time: null },
-    intake: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      caseType: PRACTICE_AREAS[0],
-      urgency: "standard",
-      details: "",
-      opposingParty: "",
-      ack: false,
-    },
-    conflictFlagged: false,
-    documents: [],
-    agreement: { agreed: false, signature: "" },
-    payment: { cardName: "", cardNumber: "", cardExpiry: "", cardCvc: "" },
     errors: {},
-    cameraOk: false,
-    micOk: false,
     userMenuOpen: false,
     settingsPrevScreen: null,
     settingsSaved: false,
@@ -92,5 +71,29 @@ export function createInitialState(overrides: InitialStateOverrides): BookingSta
         { id: 3, name: "Luis Herrera", caseType: "Immigration", urgency: "standard", attorneyId: "ramirez", conflict: false, status: "approved", reassignTo: "" },
       ],
     },
+  };
+}
+
+export function createInitialWizardState(): WizardState {
+  return {
+    booking: { consultType: "", dateIndex: null, time: null },
+    intake: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      caseType: PRACTICE_AREAS[0],
+      urgency: "standard",
+      details: "",
+      opposingParty: "",
+      ack: false,
+    },
+    conflictFlagged: false,
+    documents: [],
+    agreement: { agreed: false, signature: "" },
+    payment: { cardName: "", cardNumber: "", cardExpiry: "", cardCvc: "" },
+    errors: {},
+    cameraOk: false,
+    micOk: false,
   };
 }

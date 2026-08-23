@@ -2,36 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CONSULT_TYPES,
-  getAttorney,
-  getNext7Days,
-  initialsOf,
-} from "@/lib/booking/data";
+import { getAttorney, getNext7Days, initialsOf } from "@/lib/booking/data";
 import { createInitialState } from "@/lib/booking/initial-state";
 import type {
   AdminRole,
   AdminTab,
-  AgreementState,
-  Attorney,
   BookEntryScreen,
   BookingState,
-  IntakeState,
-  PaymentState,
   PortalTab,
   ScreenId,
   SettingsState,
   SettingsTab,
 } from "@/lib/booking/types";
-import { Header, type StepperItem, type UserMenuData } from "./header";
+import { Header, type UserMenuData } from "./header";
 import { Footer } from "./footer";
-import { BookTimeScreen } from "./screens/book-time-screen";
-import { BookIntakeScreen } from "./screens/book-intake-screen";
-import { BookDocumentsScreen } from "./screens/book-documents-screen";
-import { BookAgreementScreen } from "./screens/book-agreement-screen";
-import { BookPaymentScreen } from "./screens/book-payment-screen";
-import { BookVideoScreen } from "./screens/book-video-screen";
-import { ConfirmationScreen } from "./screens/confirmation-screen";
 import { PortalLoginScreen } from "./screens/portal-login-screen";
 import { AdminLoginScreen } from "./screens/admin-login-screen";
 import { TwoFactorScreen } from "./screens/two-factor-screen";
@@ -39,109 +23,19 @@ import { PortalScreen } from "./screens/portal-screen";
 import { AdminScreen } from "./screens/admin-screen";
 import { SettingsScreen } from "./screens/settings-screen";
 
-const BOOKING_ORDER: ScreenId[] = ["time", "intake", "documents", "agreement", "payment"];
-const STEP_LABELS = ["Time", "Intake", "Documents", "Agreement", "Payment"];
-
-const PLACEHOLDER_ATTORNEY: Attorney = {
-  id: "",
-  name: "",
-  practiceAreas: [],
-  languages: [],
-  location: "",
-  barAdmission: "",
-  bio: "",
-  avail: [],
-};
-
 interface BookingAppProps {
   initialScreen: BookEntryScreen;
-  initialAttorneyId?: string | null;
 }
 
-export function BookingApp({ initialScreen, initialAttorneyId = null }: BookingAppProps) {
+export function BookingApp({ initialScreen }: BookingAppProps) {
   const router = useRouter();
-  const [state, setState] = useState<BookingState>(() =>
-    createInitialState({ screen: initialScreen, selectedAttorneyId: initialAttorneyId })
-  );
+  const [state, setState] = useState<BookingState>(() => createInitialState({ screen: initialScreen }));
 
   const days = getNext7Days();
   const screen = state.screen;
-  const attorney = getAttorney(state.selectedAttorneyId) ?? PLACEHOLDER_ATTORNEY;
 
   // ---- navigation & simple setters ----
   const goHome = () => router.push("/");
-
-  const setConsultType = (id: string) =>
-    setState((s) => ({ ...s, booking: { ...s.booking, consultType: id } }));
-  const setDate = (i: number) =>
-    setState((s) => ({ ...s, booking: { ...s.booking, dateIndex: i, time: null } }));
-  const setTime = (t: string) => setState((s) => ({ ...s, booking: { ...s.booking, time: t } }));
-  const goToIntake = () => setState((s) => ({ ...s, screen: "intake" }));
-
-  const onIntakeChange = (patch: Partial<IntakeState>) =>
-    setState((s) => ({ ...s, intake: { ...s.intake, ...patch } }));
-
-  const submitIntake = () =>
-    setState((s) => {
-      const i = s.intake;
-      const errors: BookingState["errors"] = {};
-      if (!i.firstName.trim()) errors.firstName = true;
-      if (!i.lastName.trim()) errors.lastName = true;
-      if (!i.email.trim()) errors.email = true;
-      if (!i.phone.trim()) errors.phone = true;
-      if (!i.details.trim()) errors.details = true;
-      if (!i.ack) errors.ack = true;
-      if (Object.keys(errors).length) return { ...s, errors };
-      const flagged = i.opposingParty.trim().toLowerCase().includes("smith");
-      return { ...s, errors: {}, conflictFlagged: flagged, screen: flagged ? "intake" : "documents" };
-    });
-
-  const backToDirectoryFromConflict = () => router.push("/attorneys");
-
-  const addDemoDocument = () =>
-    setState((s) => ({ ...s, documents: [...s.documents, `Document ${s.documents.length + 1}.pdf`] }));
-  const removeDocument = (idx: number) =>
-    setState((s) => ({ ...s, documents: s.documents.filter((_, i) => i !== idx) }));
-  const goToAgreement = () => setState((s) => ({ ...s, screen: "agreement" }));
-
-  const onAgreementToggle = (agreed: boolean) =>
-    setState((s) => ({ ...s, agreement: { ...s.agreement, agreed } }));
-  const onAgreementSignature = (signature: string) =>
-    setState((s) => ({ ...s, agreement: { ...s.agreement, signature } }));
-  const submitAgreement = () =>
-    setState((s) => {
-      const a: AgreementState = s.agreement;
-      if (!a.agreed || !a.signature.trim()) return { ...s, errors: { agreement: true } };
-      return { ...s, errors: {}, screen: "payment" };
-    });
-
-  const onPaymentChange = (patch: Partial<PaymentState>) =>
-    setState((s) => ({ ...s, payment: { ...s.payment, ...patch } }));
-  const submitPayment = () =>
-    setState((s) => {
-      const isFree = s.booking.consultType === "free-phone";
-      if (!isFree) {
-        const p = s.payment;
-        if (!p.cardName.trim() || !p.cardNumber.trim() || !p.cardExpiry.trim() || !p.cardCvc.trim()) {
-          return { ...s, errors: { payment: true } };
-        }
-      }
-      return { ...s, errors: {}, screen: s.booking.consultType === "video-30" ? "video" : "confirmation" };
-    });
-
-  const toggleCameraCheck = () => setState((s) => ({ ...s, cameraOk: !s.cameraOk }));
-  const toggleMicCheck = () => setState((s) => ({ ...s, micOk: !s.micOk }));
-  const finishVideoCheck = () => setState((s) => ({ ...s, screen: "confirmation" }));
-
-  const goToStep = (target: ScreenId) =>
-    setState((s) => {
-      const current = BOOKING_ORDER.indexOf(s.screen);
-      const idx = BOOKING_ORDER.indexOf(target);
-      if (idx >= 0 && idx <= current) return { ...s, screen: target };
-      return s;
-    });
-
-  const restart = () => router.push("/attorneys");
 
   // ---- portal / user menu / settings ----
   const openPortal = () => setState((s) => ({ ...s, screen: "portal-login" }));
@@ -347,37 +241,21 @@ export function BookingApp({ initialScreen, initialAttorneyId = null }: BookingA
     }));
 
   // ---- derived / header state ----
-  const bookingOrderIdx = BOOKING_ORDER.indexOf(screen);
-  const showStepper = bookingOrderIdx >= 0;
-  const stepper: StepperItem[] | null = showStepper
-    ? STEP_LABELS.map((stepLabel, idx) => ({
-        label: stepLabel,
-        state: idx < bookingOrderIdx ? "done" : idx === bookingOrderIdx ? "current" : "todo",
-        onClick: idx < bookingOrderIdx ? () => goToStep(BOOKING_ORDER[idx]) : undefined,
-      }))
-    : null;
-
-  const isPortalArea = screen === "portal-login" || screen === "portal-2fa" || screen === "portal";
   const isStaffContext = screen === "admin" || (screen === "settings" && state.settingsPrevScreen === "admin");
   const clientBlockedScreens: ScreenId[] = ["admin-login", "admin-2fa", "admin", "portal-login", "portal-2fa"];
   const isClientContext = state.portal.loggedIn && !isStaffContext && !clientBlockedScreens.includes(screen);
-  const showBackLink =
-    !showStepper &&
-    screen !== "confirmation" &&
-    !isPortalArea &&
-    screen !== "admin-login" &&
-    screen !== "admin-2fa" &&
-    screen !== "admin" &&
-    screen !== "settings" &&
-    !isClientContext;
+  // Every remaining screen here is either the portal area, an admin screen, or settings —
+  // the "Client Portal / Questions?" link only ever applied to marketing pages and the
+  // wizard's video step, both of which now live outside BookingApp.
+  const showBackLink = false;
 
   const settingsFullName = [state.settings.firstName, state.settings.lastName].filter(Boolean).join(" ");
   let userMenu: UserMenuData | null = null;
   if (isClientContext) {
-    const defaultFirst = state.intake.firstName || "Client";
-    const defaultLast = state.intake.lastName || "Account";
+    const defaultFirst = "Client";
+    const defaultLast = "Account";
     const name = settingsFullName || `${defaultFirst} ${defaultLast}`.trim();
-    const email = state.settings.email || state.portal.loginEmail || state.intake.email || "client@example.com";
+    const email = state.settings.email || state.portal.loginEmail || "client@example.com";
     userMenu = {
       name,
       initials: initialsOf(name),
@@ -406,14 +284,8 @@ export function BookingApp({ initialScreen, initialAttorneyId = null }: BookingA
     };
   }
 
-  const ctMeta = CONSULT_TYPES.find((c) => c.id === state.booking.consultType);
-  const isFreeConsult = state.booking.consultType === "free-phone";
-  const bookingSummary = {
-    consultTypeLabel: ctMeta?.label || "",
-    priceLabel: ctMeta?.priceLabel || "",
-    dateLabel: state.booking.dateIndex != null ? days[state.booking.dateIndex].label : "",
-    time: state.booking.time || "",
-  };
+  const messagingAttorneyName =
+    getAttorney(state.portal.appointments[0]?.attorneyId)?.name ?? "";
 
   const settingsAvailableTabs: { key: SettingsTab; label: string }[] =
     state.settingsPrevScreen === "admin"
@@ -435,7 +307,7 @@ export function BookingApp({ initialScreen, initialAttorneyId = null }: BookingA
     >
       <Header
         onGoHome={goHome}
-        stepper={stepper}
+        stepper={null}
         userMenu={userMenu}
         userMenuOpen={state.userMenuOpen}
         onToggleUserMenu={toggleUserMenu}
@@ -444,83 +316,6 @@ export function BookingApp({ initialScreen, initialAttorneyId = null }: BookingA
       />
 
       <main style={{ flex: 1, width: "100%" }}>
-        {screen === "time" && (
-          <BookTimeScreen
-            attorney={attorney}
-            booking={state.booking}
-            days={days}
-            onSetConsultType={setConsultType}
-            onSetDate={setDate}
-            onSetTime={setTime}
-            onContinue={goToIntake}
-          />
-        )}
-
-        {screen === "intake" && (
-          <BookIntakeScreen
-            attorneyName={attorney.name}
-            intake={state.intake}
-            errors={state.errors}
-            conflictFlagged={state.conflictFlagged}
-            onIntakeChange={onIntakeChange}
-            onBackToDirectoryFromConflict={backToDirectoryFromConflict}
-            onSubmit={submitIntake}
-          />
-        )}
-
-        {screen === "documents" && (
-          <BookDocumentsScreen
-            documents={state.documents}
-            onAdd={addDemoDocument}
-            onRemove={removeDocument}
-            onContinue={goToAgreement}
-          />
-        )}
-
-        {screen === "agreement" && (
-          <BookAgreementScreen
-            attorneyName={attorney.name}
-            agreement={state.agreement}
-            errors={state.errors}
-            onToggle={onAgreementToggle}
-            onSignatureChange={onAgreementSignature}
-            onSubmit={submitAgreement}
-          />
-        )}
-
-        {screen === "payment" && (
-          <BookPaymentScreen
-            attorneyName={attorney.name}
-            booking={bookingSummary}
-            payment={state.payment}
-            errors={state.errors}
-            isFreeConsult={isFreeConsult}
-            onPaymentChange={onPaymentChange}
-            onSubmit={submitPayment}
-          />
-        )}
-
-        {screen === "video" && (
-          <BookVideoScreen
-            dateLabel={bookingSummary.dateLabel}
-            cameraOk={state.cameraOk}
-            micOk={state.micOk}
-            onToggleCamera={toggleCameraCheck}
-            onToggleMic={toggleMicCheck}
-            onFinish={finishVideoCheck}
-          />
-        )}
-
-        {screen === "confirmation" && (
-          <ConfirmationScreen
-            firstName={state.intake.firstName}
-            email={state.intake.email}
-            attorneyName={attorney.name}
-            booking={bookingSummary}
-            onRestart={restart}
-          />
-        )}
-
         {screen === "portal-login" && (
           <PortalLoginScreen
             loginEmail={state.portal.loginEmail}
@@ -548,7 +343,7 @@ export function BookingApp({ initialScreen, initialAttorneyId = null }: BookingA
           <PortalScreen
             portal={state.portal}
             days={days}
-            messagingAttorneyName={attorney.name}
+            messagingAttorneyName={messagingAttorneyName}
             onGoHome={goHome}
             onReschedule={startReschedule}
             onCancel={cancelAppointment}

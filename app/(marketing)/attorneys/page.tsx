@@ -150,7 +150,7 @@ export default async function AttorneysPage(props: PageProps<"/attorneys">) {
                   View profile
                 </Link>
                 <Link
-                  href={`/book?attorney=${a.id}`}
+                  href={`/book/${a.id}/time`}
                   style={{
                     flex: 1,
                     padding: "9px 0",
