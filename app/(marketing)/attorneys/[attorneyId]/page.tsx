@@ -56,7 +56,7 @@ export default async function AttorneyProfilePage(props: PageProps<"/attorneys/[
             </span>
           </div>
           <Link
-            href={`/book?attorney=${attorney.id}`}
+            href={`/book/${attorney.id}/time`}
             style={{
               display: "block",
               textAlign: "center",

@@ -67,7 +67,7 @@ export default function Home() {
         </Link>
 
         <Link
-          href={firstAvailable ? `/book?attorney=${firstAvailable.attorneyId}` : "/attorneys"}
+          href={firstAvailable ? `/book/${firstAvailable.attorneyId}/time` : "/attorneys"}
           style={{
             display: "block",
             background: "oklch(0.28 0.05 258)",

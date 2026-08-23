@@ -117,7 +117,7 @@ export function DirectoryFilters({ practiceArea, language, location }: Directory
       </Link>
       <div style={{ flex: 1 }} />
       <Link
-        href={firstAvailable ? `/book?attorney=${firstAvailable.attorneyId}` : "/attorneys"}
+        href={firstAvailable ? `/book/${firstAvailable.attorneyId}/time` : "/attorneys"}
         style={{
           padding: "11px 18px",
           border: "none",
