@@ -1,0 +1,36 @@
+import { NextResponse, type NextRequest } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
+
+/**
+ * Landing route for links in Supabase auth emails (sign-in link, email change).
+ * Handles both link styles:
+ *   - token_hash + type  (custom template: {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email)
+ *   - code               (default template / PKCE: Supabase redirects here with ?code=)
+ * `next` must be a same-site path, so the link can't become an open redirect.
+ */
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type") as EmailOtpType | null;
+  const code = searchParams.get("code");
+  const nextParam = searchParams.get("next") ?? "/portal/appointments";
+  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/portal/appointments";
+
+  const supabase = await createClient();
+  let ok = false;
+
+  if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    ok = !error;
+  } else if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    ok = !error;
+  }
+
+  const target = request.nextUrl.clone();
+  target.search = "";
+  target.pathname = ok ? next : "/portal/login";
+  if (!ok) target.searchParams.set("error", "link");
+  return NextResponse.redirect(target);
+}

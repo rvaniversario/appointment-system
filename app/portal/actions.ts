@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { publicEnv } from "@/lib/env";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -21,7 +22,11 @@ export async function requestPortalCode(email: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data,
-    options: { shouldCreateUser: false },
+    options: {
+      shouldCreateUser: false,
+      // Lets the link in the email sign the user in too (same browser), besides the code.
+      emailRedirectTo: `${publicEnv.NEXT_PUBLIC_SITE_URL}/auth/confirm?next=/portal/appointments`,
+    },
   });
   if (error && error.status === 429) {
     return { ok: false, error: "Too many attempts. Please wait a minute and try again." };

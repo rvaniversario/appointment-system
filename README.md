@@ -87,8 +87,10 @@ is guarded by `server-only` so they can never be bundled into client code.
    - **URL Configuration**: Site URL = your domain.
    - **Providers → Email**: confirm email ON. Set the OTP length to 6 and the OTP expiry
      to 600s.
-   - **Email Templates → Magic Link**: include `{{ .Token }}` so users get a code. See
-     `supabase/templates/magic_link.html`.
+   - **Email Templates → Magic Link**: paste the body of `supabase/templates/magic_link.html`.
+     It includes `{{ .Token }}`, without which the email has no code.
+   - **URL Configuration → Redirect URLs**: add `https://<your-domain>/auth/confirm` (and
+     `http://localhost:3000/auth/confirm` on the dev project).
    - **Multi-Factor**: TOTP enabled.
    - **Passwords**: minimum length 12, with lowercase, uppercase and digits required.
    - **SMTP**: Resend. The default Supabase mailer is rate-limited and not for production.
