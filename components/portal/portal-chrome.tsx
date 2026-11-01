@@ -1,31 +1,23 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { initialsOf } from "@/lib/booking/data";
 import { Header, type UserMenuData } from "@/components/booking/header";
 import { Footer } from "@/components/booking/footer";
 import { usePortalSession } from "./portal-session-context";
 
-const PUBLIC_PATHS = ["/portal/login", "/portal/verify"];
-
 export function PortalChrome({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const router = useRouter();
-  const { state, portalLogout } = usePortalSession();
+  const { state, account, portalLogout } = usePortalSession();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  useEffect(() => {
-    if (!PUBLIC_PATHS.includes(pathname) && !state.loggedIn) {
-      router.replace("/portal/login");
-    }
-  }, [pathname, state.loggedIn, router]);
-
   let userMenu: UserMenuData | null = null;
-  if (state.loggedIn) {
-    const fullName = [state.settings.firstName, state.settings.lastName].filter(Boolean).join(" ");
+  // Route protection happens on the server (app/portal/(account)/layout.tsx).
+  if (account) {
+    const fullName = [account.firstName, account.lastName].filter(Boolean).join(" ");
     const name = fullName || "Client Account";
-    const email = state.settings.email || state.loginEmail || "client@example.com";
+    const email = account.email;
     userMenu = {
       name,
       initials: initialsOf(name),

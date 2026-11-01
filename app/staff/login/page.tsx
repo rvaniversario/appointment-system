@@ -4,13 +4,15 @@ import { AdminLoginScreen } from "@/components/booking/screens/admin-login-scree
 import { useStaffSession } from "@/components/staff/staff-session-context";
 
 export default function StaffLoginPage() {
-  const { state, onAdminLoginEmail, onAdminLoginPassword, submitAdminLogin } = useStaffSession();
+  const { state, authError, authPending, onAdminLoginEmail, onAdminLoginPassword, submitAdminLogin } =
+    useStaffSession();
 
   return (
     <AdminLoginScreen
       loginEmail={state.loginEmail}
       loginPassword={state.loginPassword}
-      errors={state.errors}
+      errorMessage={authError}
+      pending={authPending}
       onEmailChange={onAdminLoginEmail}
       onPasswordChange={onAdminLoginPassword}
       onSubmit={submitAdminLogin}

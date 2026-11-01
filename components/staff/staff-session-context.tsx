@@ -1,13 +1,26 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
 import { getNext7Days } from "@/lib/booking/data";
 import { createInitialAdminState } from "@/lib/booking/initial-state";
+import { signOut } from "@/app/portal/actions";
+import { staffSignIn, staffVerifyTotp } from "@/app/staff/actions";
 import type { AdminRole, AdminState, DayInfo, SettingsState } from "@/lib/booking/types";
+
+/** The signed-in staff member, resolved on the server (null when signed out or not MFA-verified). */
+export interface StaffAccount {
+  email: string;
+  firstName: string;
+  lastName: string;
+  /** Dashboard role derived from the DB role: partners and admins see billing. */
+  role: AdminRole;
+}
 
 interface StaffSessionValue {
   state: AdminState;
+  account: StaffAccount | null;
+  authError: string | null;
+  authPending: boolean;
   days: DayInfo[];
   onAdminLoginEmail: (v: string) => void;
   onAdminLoginPassword: (v: string) => void;
@@ -15,7 +28,6 @@ interface StaffSessionValue {
   onAdminCode: (v: string) => void;
   submitAdmin2fa: () => void;
   adminLogout: () => void;
-  onAdminRoleChange: (role: AdminRole) => void;
   onAdminConflictSearch: (v: string) => void;
   setLeadReassign: (id: number, val: string) => void;
   reassignLead: (id: number) => void;
@@ -27,35 +39,50 @@ interface StaffSessionValue {
 
 const StaffSessionContext = createContext<StaffSessionValue | null>(null);
 
-export function StaffSessionProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const [state, setState] = useState<AdminState>(createInitialAdminState);
+export function StaffSessionProvider({
+  account,
+  children,
+}: {
+  account: StaffAccount | null;
+  children: ReactNode;
+}) {
+  const [localState, setState] = useState<AdminState>(createInitialAdminState);
+  // The role always comes from the server-verified account, never from client state.
+  const state: AdminState = { ...localState, role: account?.role ?? "attorney" };
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authPending, startAuthTransition] = useTransition();
   const days = getNext7Days();
 
   const onAdminLoginEmail = (v: string) => setState((s) => ({ ...s, loginEmail: v }));
   const onAdminLoginPassword = (v: string) => setState((s) => ({ ...s, loginPassword: v }));
   const submitAdminLogin = () => {
-    if (!state.loginEmail.trim() || !state.loginPassword.trim()) {
-      setState((s) => ({ ...s, errors: { adminLogin: true } }));
+    if (!state.loginEmail.trim() || !state.loginPassword) {
+      setAuthError("Enter your work email and password.");
       return;
     }
-    setState((s) => ({ ...s, errors: {} }));
-    router.push("/staff/verify");
+    startAuthTransition(async () => {
+      // Redirects to two-factor verification or enrollment on success.
+      const result = await staffSignIn(state.loginEmail, state.loginPassword);
+      if (!result.ok) setAuthError(result.error);
+      else setAuthError(null);
+      setState((s) => ({ ...s, loginPassword: "" }));
+    });
   };
 
   const onAdminCode = (v: string) => setState((s) => ({ ...s, code: v }));
   const submitAdmin2fa = () => {
     if (!state.code.trim()) {
-      setState((s) => ({ ...s, errors: { admin2fa: true } }));
+      setAuthError("Enter the 6-digit code from your authenticator app.");
       return;
     }
-    setState((s) => ({ ...s, errors: {}, loggedIn: true }));
-    router.push("/staff/calendar");
+    startAuthTransition(async () => {
+      const result = await staffVerifyTotp(state.code);
+      setAuthError(result.ok ? null : result.error);
+    });
   };
 
-  const adminLogout = () => router.push("/");
+  const adminLogout = () => startAuthTransition(() => signOut());
 
-  const onAdminRoleChange = (role: AdminRole) => setState((s) => ({ ...s, role }));
   const onAdminConflictSearch = (v: string) => setState((s) => ({ ...s, conflictSearch: v }));
   const setLeadReassign = (id: number, val: string) =>
     setState((s) => ({
@@ -96,6 +123,9 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
 
   const value: StaffSessionValue = {
     state,
+    account,
+    authError,
+    authPending,
     days,
     onAdminLoginEmail,
     onAdminLoginPassword,
@@ -103,7 +133,6 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
     onAdminCode,
     submitAdmin2fa,
     adminLogout,
-    onAdminRoleChange,
     onAdminConflictSearch,
     setLeadReassign,
     reassignLead,

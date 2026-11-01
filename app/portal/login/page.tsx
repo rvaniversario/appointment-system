@@ -4,15 +4,14 @@ import { PortalLoginScreen } from "@/components/booking/screens/portal-login-scr
 import { usePortalSession } from "@/components/portal/portal-session-context";
 
 export default function PortalLoginPage() {
-  const { state, onPortalLoginEmail, onPortalLoginPassword, submitPortalLogin } = usePortalSession();
+  const { state, authError, authPending, onPortalLoginEmail, submitPortalLogin } = usePortalSession();
 
   return (
     <PortalLoginScreen
       loginEmail={state.loginEmail}
-      loginPassword={state.loginPassword}
-      errors={state.errors}
+      errorMessage={authError}
+      pending={authPending}
       onEmailChange={onPortalLoginEmail}
-      onPasswordChange={onPortalLoginPassword}
       onSubmit={submitPortalLogin}
     />
   );

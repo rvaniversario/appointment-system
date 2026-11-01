@@ -97,9 +97,7 @@ export type PortalTab = "appointments" | "messages" | "documents";
 
 export interface PortalState {
   loginEmail: string;
-  loginPassword: string;
   code: string;
-  loggedIn: boolean;
   appointments: PortalAppointment[];
   rescheduleId: number | null;
   rescheduleDateIndex: number | null;
@@ -130,7 +128,6 @@ export interface AdminState {
   loginEmail: string;
   loginPassword: string;
   code: string;
-  loggedIn: boolean;
   role: AdminRole;
   conflictSearch: string;
   queue: QueueLead[];
@@ -161,10 +158,6 @@ export type ErrorKey =
   | "ack"
   | "agreement"
   | "payment"
-  | "portalLogin"
-  | "portal2fa"
-  | "adminLogin"
-  | "admin2fa"
   | "settingsPassword";
 
 export type ErrorState = Partial<Record<ErrorKey, boolean>>;

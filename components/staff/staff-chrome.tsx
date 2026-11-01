@@ -1,38 +1,27 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { initialsOf } from "@/lib/booking/data";
 import { Header, type UserMenuData } from "@/components/booking/header";
 import { Footer } from "@/components/booking/footer";
 import { useStaffSession } from "./staff-session-context";
 import type { AdminRole } from "@/lib/booking/types";
 
-const PUBLIC_PATHS = ["/staff/login", "/staff/verify"];
 const ROLE_LABELS: Record<AdminRole, string> = { attorney: "Attorney", partner: "Super admin" };
 
 export function StaffChrome({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const router = useRouter();
-  const { state, adminLogout } = useStaffSession();
+  const { state, account, adminLogout } = useStaffSession();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  useEffect(() => {
-    if (!PUBLIC_PATHS.includes(pathname) && !state.loggedIn) {
-      router.replace("/staff/login");
-      return;
-    }
-    if (pathname === "/staff/billing" && state.role !== "partner") {
-      router.replace("/staff/calendar");
-    }
-  }, [pathname, state.loggedIn, state.role, router]);
-
   let userMenu: UserMenuData | null = null;
-  if (state.loggedIn) {
-    const fullName = [state.settings.firstName, state.settings.lastName].filter(Boolean).join(" ");
-    const roleName = ROLE_LABELS[state.role];
+  // Route protection happens on the server (app/staff/(dashboard)/layout.tsx).
+  if (account) {
+    const fullName = [account.firstName, account.lastName].filter(Boolean).join(" ");
+    const roleName = ROLE_LABELS[account.role];
     const name = fullName || roleName;
-    const email = state.settings.email || state.loginEmail || "staff@harlowreyes.com";
+    const email = account.email;
     userMenu = {
       name,
       initials: initialsOf(name),

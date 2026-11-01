@@ -3,16 +3,15 @@
 import { AdminScreen } from "@/components/booking/screens/admin-screen";
 import { useStaffSession } from "@/components/staff/staff-session-context";
 
-export default function StaffBillingPage() {
-  const { state, days, onAdminRoleChange: onRoleChange, onAdminConflictSearch: onConflictSearchChange, setLeadReassign, reassignLead, approveLead } =
+export default function StaffAnalyticsPage() {
+  const { state, days, onAdminConflictSearch: onConflictSearchChange, setLeadReassign, reassignLead, approveLead } =
     useStaffSession();
 
   return (
     <AdminScreen
-      activeTab="billing"
+      activeTab="analytics"
       admin={state}
       days={days}
-      onRoleChange={onRoleChange}
       onConflictSearchChange={onConflictSearchChange}
       onLeadReassignChange={setLeadReassign}
       onReassignLead={reassignLead}

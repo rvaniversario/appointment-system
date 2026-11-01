@@ -8,7 +8,6 @@ interface AdminScreenProps {
   activeTab: AdminTab;
   admin: AdminState;
   days: DayInfo[];
-  onRoleChange: (role: AdminRole) => void;
   onConflictSearchChange: (v: string) => void;
   onLeadReassignChange: (id: number, val: string) => void;
   onReassignLead: (id: number) => void;
@@ -44,7 +43,6 @@ export function AdminScreen({
   activeTab,
   admin,
   days,
-  onRoleChange,
   onConflictSearchChange,
   onLeadReassignChange,
   onReassignLead,
@@ -138,27 +136,8 @@ export function AdminScreen({
             Staff Dashboard
           </h1>
           <div style={{ fontSize: 14, color: "oklch(0.55 0.01 258)" }}>
-            Viewing as: {roleLabels[admin.role]}
+            Signed in as: {roleLabels[admin.role]}
           </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>
-            Demo role
-          </label>
-          <select
-            value={admin.role}
-            onChange={(e) => onRoleChange(e.target.value as AdminRole)}
-            style={{
-              padding: "9px 10px",
-              border: "1px solid oklch(0.85 0.005 90)",
-              borderRadius: 7,
-              fontSize: 14,
-              background: "#fff",
-            }}
-          >
-            <option value="attorney">Attorney</option>
-            <option value="partner">Super admin</option>
-          </select>
         </div>
       </div>
 

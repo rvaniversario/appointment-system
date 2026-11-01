@@ -1,27 +1,34 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { portalLoginFieldStyle } from "@/lib/booking/ui";
 
 interface TwoFactorScreenProps {
   title: string;
   subtitle: string;
   code: string;
-  hasError: boolean;
+  errorMessage: string | null;
+  pending: boolean;
   onCodeChange: (v: string) => void;
   onSubmit: () => void;
-  showResend?: boolean;
+  /** Shows a "Resend code" link (email codes only). */
+  onResend?: () => void;
   centered?: boolean;
+  /** Extra content above the code field, e.g. an enrollment QR code. */
+  children?: ReactNode;
 }
 
 export function TwoFactorScreen({
   title,
   subtitle,
   code,
-  hasError,
+  errorMessage,
+  pending,
   onCodeChange,
   onSubmit,
-  showResend,
+  onResend,
   centered,
+  children,
 }: TwoFactorScreenProps) {
   const body = (
     <div style={{ maxWidth: 420, width: centered ? "100%" : undefined }}>
@@ -37,44 +44,65 @@ export function TwoFactorScreen({
         {title}
       </h1>
       <p style={{ fontSize: 15, color: "oklch(0.5 0.01 258)", margin: "0 0 28px" }}>{subtitle}</p>
-      <input
-        type="text"
-        value={code}
-        onChange={(e) => onCodeChange(e.target.value)}
-        placeholder="123456"
-        style={{
-          ...portalLoginFieldStyle,
-          fontSize: 20,
-          letterSpacing: "0.2em",
-          textAlign: "center",
-          marginBottom: 6,
-        }}
-      />
-      {hasError && (
-        <div style={{ fontSize: 12.5, color: "oklch(0.55 0.16 25)", marginBottom: 10 }}>
-          Enter the code to continue
-        </div>
-      )}
-      <button
-        onClick={onSubmit}
-        style={{
-          padding: "13px 0",
-          border: "none",
-          borderRadius: 8,
-          background: "oklch(0.28 0.05 258)",
-          color: "#fff",
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: "pointer",
-          width: "100%",
-          marginTop: 10,
+      {children}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
         }}
       >
-        Verify &amp; continue
-      </button>
-      {showResend && (
+        <label htmlFor="otp-code" style={{ position: "absolute", left: -9999 }}>
+          6-digit code
+        </label>
+        <input
+          id="otp-code"
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="[0-9]{6}"
+          maxLength={6}
+          value={code}
+          onChange={(e) => onCodeChange(e.target.value.replace(/\D/g, ""))}
+          placeholder="123456"
+          style={{
+            ...portalLoginFieldStyle,
+            fontSize: 20,
+            letterSpacing: "0.2em",
+            textAlign: "center",
+            marginBottom: 6,
+          }}
+        />
+        {errorMessage && (
+          <div role="alert" style={{ fontSize: 12.5, color: "oklch(0.55 0.16 25)", marginBottom: 10 }}>
+            {errorMessage}
+          </div>
+        )}
+        <button
+          type="submit"
+          disabled={pending}
+          style={{
+            padding: "13px 0",
+            border: "none",
+            borderRadius: 8,
+            background: "oklch(0.28 0.05 258)",
+            color: "#fff",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: pending ? "wait" : "pointer",
+            opacity: pending ? 0.7 : 1,
+            width: "100%",
+            marginTop: 10,
+          }}
+        >
+          {pending ? "Verifying…" : "Verify & continue"}
+        </button>
+      </form>
+      {onResend && (
         <div style={{ textAlign: "center", marginTop: 14 }}>
           <button
+            type="button"
+            onClick={onResend}
+            disabled={pending}
             style={{
               border: "none",
               background: "none",

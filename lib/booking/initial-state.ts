@@ -18,9 +18,7 @@ function createInitialSettings(): SettingsState {
 export function createInitialPortalState(): PortalState {
   return {
     loginEmail: "",
-    loginPassword: "",
     code: "",
-    loggedIn: false,
     appointments: [
       {
         id: 1,
@@ -58,8 +56,7 @@ export function createInitialAdminState(): AdminState {
     loginEmail: "",
     loginPassword: "",
     code: "",
-    loggedIn: false,
-    role: "partner",
+    role: "attorney",
     conflictSearch: "",
     queue: [
       { id: 1, name: "Jordan Blake", caseType: "Family Law", urgency: "urgent", attorneyId: "chen", conflict: false, status: "pending", reassignTo: "" },

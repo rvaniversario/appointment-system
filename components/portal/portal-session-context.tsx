@@ -1,20 +1,32 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { requestPortalCode, signOut, verifyPortalCode } from "@/app/portal/actions";
 import { getAttorney, getNext7Days } from "@/lib/booking/data";
 import { createInitialPortalState } from "@/lib/booking/initial-state";
 import type { DayInfo, PortalState, SettingsState } from "@/lib/booking/types";
 
+/** The signed-in client, resolved on the server (null when signed out). */
+export interface PortalAccount {
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
 interface PortalSessionValue {
   state: PortalState;
+  account: PortalAccount | null;
+  /** Message from the last failed sign-in step. */
+  authError: string | null;
+  authPending: boolean;
   days: DayInfo[];
   messagingAttorneyName: string;
   onPortalLoginEmail: (v: string) => void;
-  onPortalLoginPassword: (v: string) => void;
   submitPortalLogin: () => void;
   onPortalCode: (v: string) => void;
   submitPortal2fa: () => void;
+  resendPortalCode: () => void;
   portalLogout: () => void;
   startReschedule: (id: number) => void;
   cancelRescheduleUI: () => void;
@@ -34,33 +46,57 @@ interface PortalSessionValue {
 
 const PortalSessionContext = createContext<PortalSessionValue | null>(null);
 
-export function PortalSessionProvider({ children }: { children: ReactNode }) {
+export function PortalSessionProvider({
+  account,
+  children,
+}: {
+  account: PortalAccount | null;
+  children: ReactNode;
+}) {
   const router = useRouter();
   const [state, setState] = useState<PortalState>(createInitialPortalState);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authPending, startAuthTransition] = useTransition();
   const days = getNext7Days();
 
   const onPortalLoginEmail = (v: string) => setState((s) => ({ ...s, loginEmail: v }));
-  const onPortalLoginPassword = (v: string) => setState((s) => ({ ...s, loginPassword: v }));
   const submitPortalLogin = () => {
-    if (!state.loginEmail.trim() || !state.loginPassword.trim()) {
-      setState((s) => ({ ...s, errors: { portalLogin: true } }));
+    const email = state.loginEmail.trim();
+    if (!email) {
+      setAuthError("Enter your email address.");
       return;
     }
-    setState((s) => ({ ...s, errors: {} }));
-    router.push("/portal/verify");
+    startAuthTransition(async () => {
+      const result = await requestPortalCode(email);
+      if (!result.ok) {
+        setAuthError(result.error);
+        return;
+      }
+      setAuthError(null);
+      router.push("/portal/verify");
+    });
   };
+
+  const resendPortalCode = () =>
+    startAuthTransition(async () => {
+      const result = await requestPortalCode(state.loginEmail);
+      setAuthError(result.ok ? null : result.error);
+    });
 
   const onPortalCode = (v: string) => setState((s) => ({ ...s, code: v }));
   const submitPortal2fa = () => {
     if (!state.code.trim()) {
-      setState((s) => ({ ...s, errors: { portal2fa: true } }));
+      setAuthError("Enter the 6-digit code from your email.");
       return;
     }
-    setState((s) => ({ ...s, errors: {}, loggedIn: true }));
-    router.push("/portal/appointments");
+    startAuthTransition(async () => {
+      // Redirects into the portal on success.
+      const result = await verifyPortalCode(state.loginEmail, state.code);
+      setAuthError(result.ok ? null : result.error);
+    });
   };
 
-  const portalLogout = () => router.push("/");
+  const portalLogout = () => startAuthTransition(() => signOut());
 
   const startReschedule = (id: number) =>
     setState((s) => ({ ...s, rescheduleId: id, rescheduleDateIndex: null, rescheduleTime: null }));
@@ -128,13 +164,16 @@ export function PortalSessionProvider({ children }: { children: ReactNode }) {
 
   const value: PortalSessionValue = {
     state,
+    account,
+    authError,
+    authPending,
     days,
     messagingAttorneyName,
     onPortalLoginEmail,
-    onPortalLoginPassword,
     submitPortalLogin,
     onPortalCode,
     submitPortal2fa,
+    resendPortalCode,
     portalLogout,
     startReschedule,
     cancelRescheduleUI,
