@@ -1,13 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { ATTORNEYS, CONFLICT_DB, getAttorney } from "@/lib/booking/data";
 import type { AdminRole, AdminState, AdminTab, DayInfo } from "@/lib/booking/types";
 
 interface AdminScreenProps {
+  activeTab: AdminTab;
   admin: AdminState;
   days: DayInfo[];
-  onRoleChange: (role: AdminRole) => void;
-  onSetTab: (tab: AdminTab) => void;
   onConflictSearchChange: (v: string) => void;
   onLeadReassignChange: (id: number, val: string) => void;
   onReassignLead: (id: number) => void;
@@ -40,10 +40,9 @@ const MY_WEEKLY: Record<string, number[]> = {
 };
 
 export function AdminScreen({
+  activeTab,
   admin,
   days,
-  onRoleChange,
-  onSetTab,
   onConflictSearchChange,
   onLeadReassignChange,
   onReassignLead,
@@ -137,38 +136,19 @@ export function AdminScreen({
             Staff Dashboard
           </h1>
           <div style={{ fontSize: 14, color: "oklch(0.55 0.01 258)" }}>
-            Viewing as: {roleLabels[admin.role]}
+            Signed in as: {roleLabels[admin.role]}
           </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>
-            Demo role
-          </label>
-          <select
-            value={admin.role}
-            onChange={(e) => onRoleChange(e.target.value as AdminRole)}
-            style={{
-              padding: "9px 10px",
-              border: "1px solid oklch(0.85 0.005 90)",
-              borderRadius: 7,
-              fontSize: 14,
-              background: "#fff",
-            }}
-          >
-            <option value="attorney">Attorney</option>
-            <option value="partner">Super admin</option>
-          </select>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "210px 1fr", gap: 32 }}>
         <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {allowedTabs.map((key) => {
-            const active = admin.tab === key;
+            const active = activeTab === key;
             return (
-              <div
+              <Link
                 key={key}
-                onClick={() => onSetTab(key)}
+                href={`/staff/${key}`}
                 style={{
                   padding: "10px 14px",
                   borderRadius: 8,
@@ -177,15 +157,16 @@ export function AdminScreen({
                   cursor: "pointer",
                   background: active ? "oklch(0.28 0.05 258)" : "transparent",
                   color: active ? "#fff" : "oklch(0.4 0.01 258)",
+                  textDecoration: "none",
                 }}
               >
                 {tabLabels[key]}
-              </div>
+              </Link>
             );
           })}
         </nav>
         <div style={{ minWidth: 0 }}>
-          {admin.tab === "calendar" && (
+          {activeTab === "calendar" && (
             <div style={{ overflowX: "auto" }}>
               <div style={{ display: "grid", gridTemplateColumns: "160px repeat(7,1fr)", minWidth: 760 }}>
                 <div />
@@ -241,7 +222,7 @@ export function AdminScreen({
             </div>
           )}
 
-          {admin.tab === "queue" && (
+          {activeTab === "queue" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {adminQueueItems.map((lead) => (
                 <div
@@ -364,7 +345,7 @@ export function AdminScreen({
             </div>
           )}
 
-          {admin.tab === "conflicts" && (
+          {activeTab === "conflicts" && (
             <>
               <input
                 type="text"
@@ -405,7 +386,7 @@ export function AdminScreen({
             </>
           )}
 
-          {admin.tab === "analytics" && (
+          {activeTab === "analytics" && (
             <>
               <div
                 style={{
@@ -475,7 +456,7 @@ export function AdminScreen({
             </>
           )}
 
-          {admin.tab === "billing" && (
+          {activeTab === "billing" && (
             <div
               style={{
                 background: "#fff",

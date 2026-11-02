@@ -1,12 +1,12 @@
 "use client";
 
-import type { ErrorState } from "@/lib/booking/types";
 import { label, portalLoginFieldStyle } from "@/lib/booking/ui";
 
 interface AdminLoginScreenProps {
   loginEmail: string;
   loginPassword: string;
-  errors: ErrorState;
+  errorMessage: string | null;
+  pending: boolean;
   onEmailChange: (v: string) => void;
   onPasswordChange: (v: string) => void;
   onSubmit: () => void;
@@ -15,7 +15,8 @@ interface AdminLoginScreenProps {
 export function AdminLoginScreen({
   loginEmail,
   loginPassword,
-  errors,
+  errorMessage,
+  pending,
   onEmailChange,
   onPasswordChange,
   onSubmit,
@@ -46,32 +47,49 @@ export function AdminLoginScreen({
           For attorneys and firm staff only. Two-factor authentication is required on every
           login.
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: 14 }}
+        >
           <div>
-            <label style={label}>Work email</label>
+            <label htmlFor="staff-email" style={label}>
+              Work email
+            </label>
             <input
+              id="staff-email"
               type="email"
+              autoComplete="username"
+              required
               value={loginEmail}
               onChange={(e) => onEmailChange(e.target.value)}
               style={portalLoginFieldStyle}
             />
           </div>
           <div>
-            <label style={label}>Password</label>
+            <label htmlFor="staff-password" style={label}>
+              Password
+            </label>
             <input
+              id="staff-password"
               type="password"
+              autoComplete="current-password"
+              required
               value={loginPassword}
               onChange={(e) => onPasswordChange(e.target.value)}
               style={portalLoginFieldStyle}
             />
           </div>
-          {errors.adminLogin && (
-            <div style={{ fontSize: 12.5, color: "oklch(0.55 0.16 25)" }}>
-              Enter your work email and password
+          {errorMessage && (
+            <div role="alert" style={{ fontSize: 12.5, color: "oklch(0.55 0.16 25)" }}>
+              {errorMessage}
             </div>
           )}
           <button
-            onClick={onSubmit}
+            type="submit"
+            disabled={pending}
             style={{
               padding: "13px 0",
               border: "none",
@@ -80,23 +98,14 @@ export function AdminLoginScreen({
               color: "#fff",
               fontSize: 15,
               fontWeight: 600,
-              cursor: "pointer",
+              cursor: pending ? "wait" : "pointer",
+              opacity: pending ? 0.7 : 1,
               marginTop: 6,
             }}
           >
-            Log in
+            {pending ? "Signing in…" : "Log in"}
           </button>
-          <div
-            style={{
-              textAlign: "center",
-              fontSize: 12.5,
-              color: "oklch(0.6 0.01 258)",
-              marginTop: 4,
-            }}
-          >
-            Or continue with SSO (Google Workspace / Microsoft 365)
-          </div>
-        </div>
+        </form>
       </div>
     </div>
   );

@@ -178,7 +178,8 @@ export function Header({
         )}
 
         {userMenu && (
-          <div style={{ position: "relative" }}>
+          // Always the rightmost item, after the "Questions?" block.
+          <div style={{ position: "relative", order: 3 }}>
             <div
               onClick={onToggleUserMenu}
               style={{
@@ -253,7 +254,8 @@ export function Header({
           </div>
         )}
 
-        {showBackLink && (
+        {/* Signed-out visitors only; signed-in users get the account menu instead. */}
+        {showBackLink && !userMenu && (
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <button
               onClick={onOpenPortal}

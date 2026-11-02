@@ -1,10 +1,11 @@
 "use client";
 
 import { TIME_SLOTS, getAttorney } from "@/lib/booking/data";
-import type { DayInfo, PortalState } from "@/lib/booking/types";
+import type { DayInfo, PortalState, PortalTab } from "@/lib/booking/types";
 import { linkButton } from "@/lib/booking/ui";
 
 interface PortalScreenProps {
+  activeTab: PortalTab;
   portal: PortalState;
   days: DayInfo[];
   messagingAttorneyName: string;
@@ -21,6 +22,7 @@ interface PortalScreenProps {
 }
 
 export function PortalScreen({
+  activeTab,
   portal,
   days,
   messagingAttorneyName,
@@ -43,7 +45,7 @@ export function PortalScreen({
         ← Back
       </button>
 
-      {portal.tab === "appointments" && (
+      {activeTab === "appointments" && (
         <div>
           <h2
             style={{
@@ -260,7 +262,7 @@ export function PortalScreen({
         </div>
       )}
 
-      {portal.tab === "messages" && (
+      {activeTab === "messages" && (
         <div>
           <h2
             style={{
@@ -340,7 +342,7 @@ export function PortalScreen({
         </div>
       )}
 
-      {portal.tab === "documents" && (
+      {activeTab === "documents" && (
         <div>
           <h2
             style={{
