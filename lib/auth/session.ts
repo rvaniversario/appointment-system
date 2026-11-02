@@ -29,12 +29,19 @@ export const getSessionAccount = cache(async (): Promise<SessionAccount | null> 
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims?.sub) return null;
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id, email, role, first_name, last_name")
     .eq("id", data.claims.sub)
     .single();
-  if (!profile) return null;
+  if (!profile) {
+    // A valid session without a readable profile means a schema/migration problem, not a sign-out.
+    console.error("[auth] profile lookup failed for signed-in user", {
+      code: profileError?.code,
+      message: profileError?.message,
+    });
+    return null;
+  }
 
   return {
     id: profile.id,

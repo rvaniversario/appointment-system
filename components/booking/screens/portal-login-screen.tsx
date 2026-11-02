@@ -32,7 +32,7 @@ export function PortalLoginScreen({
       </h1>
       <p style={{ fontSize: 15, color: "oklch(0.5 0.01 258)", margin: "0 0 28px" }}>
         Log in to view appointments, message your attorney, and manage documents. We&apos;ll
-        email you a 6-digit sign-in code.
+        email you a sign-in code.
       </p>
       <form
         onSubmit={(e) => {

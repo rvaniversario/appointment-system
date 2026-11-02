@@ -13,6 +13,8 @@ interface TwoFactorScreenProps {
   onSubmit: () => void;
   /** Shows a "Resend code" link (email codes only). */
   onResend?: () => void;
+  /** Longest code accepted. Authenticator apps use 6; Supabase email codes can be up to 10. */
+  maxCodeLength?: number;
   centered?: boolean;
   /** Extra content above the code field, e.g. an enrollment QR code. */
   children?: ReactNode;
@@ -27,6 +29,7 @@ export function TwoFactorScreen({
   onCodeChange,
   onSubmit,
   onResend,
+  maxCodeLength = 6,
   centered,
   children,
 }: TwoFactorScreenProps) {
@@ -52,15 +55,15 @@ export function TwoFactorScreen({
         }}
       >
         <label htmlFor="otp-code" style={{ position: "absolute", left: -9999 }}>
-          6-digit code
+          Verification code
         </label>
         <input
           id="otp-code"
           type="text"
           inputMode="numeric"
           autoComplete="one-time-code"
-          pattern="[0-9]{6}"
-          maxLength={6}
+          pattern={`[0-9]{6,${maxCodeLength}}`}
+          maxLength={maxCodeLength}
           value={code}
           onChange={(e) => onCodeChange(e.target.value.replace(/\D/g, ""))}
           placeholder="123456"

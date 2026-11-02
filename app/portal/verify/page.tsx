@@ -18,7 +18,8 @@ export default function PortalVerifyPage() {
   return (
     <TwoFactorScreen
       title="Verify it's you"
-      subtitle={`If ${state.loginEmail} has a client account, we've sent it a 6-digit code. It expires in 10 minutes.`}
+      subtitle={`If ${state.loginEmail} has a client account, we've sent it a sign-in code. Use the code from the most recent email.`}
+      maxCodeLength={10}
       code={state.code}
       errorMessage={authError}
       pending={authPending}

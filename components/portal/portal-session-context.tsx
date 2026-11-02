@@ -86,7 +86,7 @@ export function PortalSessionProvider({
   const onPortalCode = (v: string) => setState((s) => ({ ...s, code: v }));
   const submitPortal2fa = () => {
     if (!state.code.trim()) {
-      setAuthError("Enter the 6-digit code from your email.");
+      setAuthError("Enter the code from your email.");
       return;
     }
     startAuthTransition(async () => {

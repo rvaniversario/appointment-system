@@ -64,6 +64,11 @@ $$;
 create trigger on_auth_user_created after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Users created before this migration ran get a profile too.
+insert into public.profiles (id, email)
+select id, coalesce(email, '') from auth.users
+on conflict (id) do nothing;
+
 create function public.handle_user_email_change() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
