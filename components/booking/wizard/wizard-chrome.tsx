@@ -5,12 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { Header, type StepperItem } from "@/components/booking/header";
 import { Footer } from "@/components/booking/footer";
 import { BOOKING_STEP_LABELS, BOOKING_STEP_ORDER, isAgreementStepComplete, isTimeStepComplete } from "@/lib/booking/wizard";
+import { useHeaderUserMenu } from "@/components/auth/use-header-user-menu";
 import { useWizard } from "./wizard-context";
 
 export function WizardChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { attorney, state } = useWizard();
+  const { userMenu, userMenuOpen, toggleUserMenu } = useHeaderUserMenu();
 
   const currentStep = pathname.split("/").pop() ?? "";
   const stepIdx = BOOKING_STEP_ORDER.indexOf(currentStep as (typeof BOOKING_STEP_ORDER)[number]);
@@ -48,9 +50,9 @@ export function WizardChrome({ children }: { children: ReactNode }) {
       <Header
         onGoHome={() => router.push("/")}
         stepper={stepper}
-        userMenu={null}
-        userMenuOpen={false}
-        onToggleUserMenu={() => {}}
+        userMenu={userMenu}
+        userMenuOpen={userMenuOpen}
+        onToggleUserMenu={toggleUserMenu}
         showBackLink={currentStep === "video"}
         onOpenPortal={() => router.push("/portal/login")}
       />
