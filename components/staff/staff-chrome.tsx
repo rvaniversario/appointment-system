@@ -12,7 +12,7 @@ const ROLE_LABELS: Record<AdminRole, string> = { attorney: "Attorney", partner: 
 
 export function StaffChrome({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { state, account, adminLogout } = useStaffSession();
+  const { account, adminLogout } = useStaffSession();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   let userMenu: UserMenuData | null = null;
@@ -27,7 +27,7 @@ export function StaffChrome({ children }: { children: ReactNode }) {
       initials: initialsOf(name),
       email,
       isClient: false,
-      photo: state.settings.photo,
+      photo: account.photoUrl,
       onLogout: adminLogout,
       onSettings: () => router.push("/staff/settings"),
     };
@@ -53,7 +53,7 @@ export function StaffChrome({ children }: { children: ReactNode }) {
         onOpenPortal={() => router.push("/portal/login")}
       />
       <main style={{ flex: 1, width: "100%" }}>{children}</main>
-      <Footer onOpenAdmin={() => router.push("/staff/login")} />
+      <Footer signedIn={Boolean(account)} onOpenAdmin={() => router.push("/staff/login")} />
     </div>
   );
 }

@@ -1,17 +1,16 @@
 "use client";
 
 import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
+import { useAccountSettings, type AccountSettings } from "@/components/account/use-account-settings";
 import { getNext7Days } from "@/lib/booking/data";
 import { createInitialAdminState } from "@/lib/booking/initial-state";
 import { signOut } from "@/app/portal/actions";
-import { staffSignIn, staffVerifyTotp } from "@/app/staff/actions";
-import type { AdminRole, AdminState, DayInfo, SettingsState } from "@/lib/booking/types";
+import { staffSignIn, staffVerifyTotp, updateStaffPassword } from "@/app/staff/actions";
+import type { AdminRole, AdminState, DayInfo } from "@/lib/booking/types";
+import type { AccountProfile } from "@/lib/profile/types";
 
 /** The signed-in staff member, resolved on the server (null when signed out or not MFA-verified). */
-export interface StaffAccount {
-  email: string;
-  firstName: string;
-  lastName: string;
+export interface StaffAccount extends AccountProfile {
   /** Dashboard role derived from the DB role: partners and admins see billing. */
   role: AdminRole;
 }
@@ -32,9 +31,7 @@ interface StaffSessionValue {
   setLeadReassign: (id: number, val: string) => void;
   reassignLead: (id: number) => void;
   approveLead: (id: number) => void;
-  onSettingsFieldChange: (patch: Partial<SettingsState>) => void;
-  onSettingsPhotoChange: (dataUrl: string) => void;
-  saveSettings: () => boolean;
+  accountSettings: AccountSettings;
 }
 
 const StaffSessionContext = createContext<StaffSessionValue | null>(null);
@@ -51,6 +48,7 @@ export function StaffSessionProvider({
   const state: AdminState = { ...localState, role: account?.role ?? "attorney" };
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, startAuthTransition] = useTransition();
+  const accountSettings = useAccountSettings(account, updateStaffPassword);
   const days = getNext7Days();
 
   const onAdminLoginEmail = (v: string) => setState((s) => ({ ...s, loginEmail: v }));
@@ -104,23 +102,6 @@ export function StaffSessionProvider({
       queue: s.queue.map((l) => (l.id === id ? { ...l, status: "approved" as const } : l)),
     }));
 
-  const onSettingsFieldChange = (patch: Partial<SettingsState>) =>
-    setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
-  const onSettingsPhotoChange = (dataUrl: string) =>
-    setState((s) => ({ ...s, settings: { ...s.settings, photo: dataUrl } }));
-  const saveSettings = (): boolean => {
-    if (state.settings.password && state.settings.password !== state.settings.confirmPassword) {
-      setState((s) => ({ ...s, errors: { settingsPassword: true } }));
-      return false;
-    }
-    setState((s) => ({
-      ...s,
-      errors: {},
-      settings: { ...s.settings, password: "", confirmPassword: "" },
-    }));
-    return true;
-  };
-
   const value: StaffSessionValue = {
     state,
     account,
@@ -137,9 +118,7 @@ export function StaffSessionProvider({
     setLeadReassign,
     reassignLead,
     approveLead,
-    onSettingsFieldChange,
-    onSettingsPhotoChange,
-    saveSettings,
+    accountSettings,
   };
 
   return <StaffSessionContext.Provider value={value}>{children}</StaffSessionContext.Provider>;

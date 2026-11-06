@@ -106,8 +106,6 @@ export interface PortalState {
   messageDraft: string;
   documents: PortalDocument[];
   invoices: PortalInvoice[];
-  settings: SettingsState;
-  errors: ErrorState;
 }
 
 export type AdminRole = "attorney" | "partner";
@@ -131,8 +129,6 @@ export interface AdminState {
   role: AdminRole;
   conflictSearch: string;
   queue: QueueLead[];
-  settings: SettingsState;
-  errors: ErrorState;
 }
 
 export type SettingsTab = "profile" | "billing";
@@ -157,8 +153,7 @@ export type ErrorKey =
   | "details"
   | "ack"
   | "agreement"
-  | "payment"
-  | "settingsPassword";
+  | "payment";
 
 export type ErrorState = Partial<Record<ErrorKey, boolean>>;
 

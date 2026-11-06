@@ -13,27 +13,18 @@ const AVAILABLE_TABS: { key: SettingsTab; label: string }[] = [
 
 export default function PortalSettingsPage() {
   const router = useRouter();
-  const { state, onSettingsFieldChange, onSettingsPhotoChange, saveSettings, payInvoice } = usePortalSession();
+  const { state, accountSettings, payInvoice } = usePortalSession();
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("profile");
-  const [settingsSaved, setSettingsSaved] = useState(false);
-
-  const handleSave = () => {
-    if (saveSettings()) setSettingsSaved(true);
-  };
 
   return (
     <SettingsScreen
-      settings={state.settings}
+      account={accountSettings}
+      showPasswordFields={false}
       settingsTab={settingsTab}
-      settingsSaved={settingsSaved}
-      errors={state.errors}
       availableTabs={AVAILABLE_TABS}
       portalInvoiceItems={state.invoices}
       onBack={() => router.push("/portal/appointments")}
       onSetTab={setSettingsTab}
-      onFieldChange={onSettingsFieldChange}
-      onPhotoChange={onSettingsPhotoChange}
-      onSave={handleSave}
       onPayInvoice={payInvoice}
     />
   );

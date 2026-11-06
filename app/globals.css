@@ -24,6 +24,12 @@ textarea {
   font-family: var(--font-public-sans), sans-serif;
 }
 
+/* Edge's built-in reveal icon would sit next to the one in PasswordInput. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
