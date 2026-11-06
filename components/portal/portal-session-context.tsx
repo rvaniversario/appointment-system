@@ -3,16 +3,14 @@
 import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { requestPortalCode, signOut, verifyPortalCode } from "@/app/portal/actions";
+import { useAccountSettings, type AccountSettings } from "@/components/account/use-account-settings";
 import { getAttorney, getNext7Days } from "@/lib/booking/data";
 import { createInitialPortalState } from "@/lib/booking/initial-state";
-import type { DayInfo, PortalState, SettingsState } from "@/lib/booking/types";
+import type { DayInfo, PortalState } from "@/lib/booking/types";
+import type { AccountProfile } from "@/lib/profile/types";
 
 /** The signed-in client, resolved on the server (null when signed out). */
-export interface PortalAccount {
-  email: string;
-  firstName: string;
-  lastName: string;
-}
+export type PortalAccount = AccountProfile;
 
 interface PortalSessionValue {
   state: PortalState;
@@ -38,10 +36,7 @@ interface PortalSessionValue {
   sendPortalMessage: () => void;
   addPortalDocument: () => void;
   payInvoice: (id: number) => void;
-  onSettingsFieldChange: (patch: Partial<SettingsState>) => void;
-  onSettingsPhotoChange: (dataUrl: string) => void;
-  /** Reads current state synchronously and returns whether the save succeeded. */
-  saveSettings: () => boolean;
+  accountSettings: AccountSettings;
 }
 
 const PortalSessionContext = createContext<PortalSessionValue | null>(null);
@@ -57,6 +52,7 @@ export function PortalSessionProvider({
   const [state, setState] = useState<PortalState>(createInitialPortalState);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, startAuthTransition] = useTransition();
+  const accountSettings = useAccountSettings(account);
   const days = getNext7Days();
 
   const onPortalLoginEmail = (v: string) => setState((s) => ({ ...s, loginEmail: v }));
@@ -143,23 +139,6 @@ export function PortalSessionProvider({
       invoices: s.invoices.map((inv) => (inv.id === id ? { ...inv, status: "paid" as const } : inv)),
     }));
 
-  const onSettingsFieldChange = (patch: Partial<SettingsState>) =>
-    setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
-  const onSettingsPhotoChange = (dataUrl: string) =>
-    setState((s) => ({ ...s, settings: { ...s.settings, photo: dataUrl } }));
-  const saveSettings = (): boolean => {
-    if (state.settings.password && state.settings.password !== state.settings.confirmPassword) {
-      setState((s) => ({ ...s, errors: { settingsPassword: true } }));
-      return false;
-    }
-    setState((s) => ({
-      ...s,
-      errors: {},
-      settings: { ...s.settings, password: "", confirmPassword: "" },
-    }));
-    return true;
-  };
-
   const messagingAttorneyName = getAttorney(state.appointments[0]?.attorneyId)?.name ?? "";
 
   const value: PortalSessionValue = {
@@ -185,9 +164,7 @@ export function PortalSessionProvider({
     sendPortalMessage,
     addPortalDocument,
     payInvoice,
-    onSettingsFieldChange,
-    onSettingsPhotoChange,
-    saveSettings,
+    accountSettings,
   };
 
   return <PortalSessionContext.Provider value={value}>{children}</PortalSessionContext.Provider>;

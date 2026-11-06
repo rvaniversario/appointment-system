@@ -57,7 +57,7 @@ export function WizardChrome({ children }: { children: ReactNode }) {
         onOpenPortal={() => router.push("/portal/login")}
       />
       <main style={{ flex: 1, width: "100%" }}>{children}</main>
-      <Footer onOpenAdmin={() => router.push("/staff/login")} />
+      <Footer signedIn={Boolean(userMenu)} onOpenAdmin={() => router.push("/staff/login")} />
     </div>
   );
 }

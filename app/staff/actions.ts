@@ -3,11 +3,15 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { hasVerifiedTotp, isStaffRole } from "@/lib/auth/session";
+import { hasVerifiedTotp, isStaffRole, requireStaff } from "@/lib/auth/session";
 import type { ActionResult } from "@/app/portal/actions";
 
 const GENERIC_LOGIN_ERROR = "Incorrect email or password.";
 const codeSchema = z.string().trim().regex(/^\d{6}$/);
+// Mirrors the Supabase Auth password policy; 72 is the bcrypt limit Supabase enforces.
+const newPasswordSchema = z.string().min(12).max(72).regex(/[a-z]/).regex(/[A-Z]/).regex(/\d/);
+const PASSWORD_POLICY_ERROR =
+  "Use 12 to 72 characters with at least one uppercase letter, one lowercase letter and one number.";
 
 export async function staffSignIn(email: string, password: string): Promise<ActionResult> {
   const parsed = z
@@ -45,6 +49,31 @@ export async function staffVerifyTotp(code: string): Promise<ActionResult> {
   if (error) return { ok: false, error: "That code is incorrect. Check your authenticator app and try again." };
 
   redirect("/staff/calendar");
+}
+
+/** Changes the password of the signed-in, MFA-verified staff member. */
+export async function updateStaffPassword(password: string): Promise<ActionResult> {
+  await requireStaff();
+
+  const parsed = newPasswordSchema.safeParse(password);
+  if (!parsed.success) return { ok: false, error: PASSWORD_POLICY_ERROR };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password: parsed.data });
+  if (!error) return { ok: true };
+
+  switch (error.code) {
+    case "same_password":
+      return { ok: false, error: "Your new password must be different from your current password." };
+    case "weak_password":
+      return { ok: false, error: PASSWORD_POLICY_ERROR };
+    case "reauthentication_needed":
+      return { ok: false, error: "For your security, sign out and sign back in, then change your password." };
+  }
+  if (error.status === 429) return { ok: false, error: "Too many attempts. Please wait and try again." };
+
+  console.error("[staff] password update failed", { status: error.status, code: error.code, message: error.message });
+  return { ok: false, error: "We couldn't update your password. Your current password still works." };
 }
 
 export type EnrollmentResult =

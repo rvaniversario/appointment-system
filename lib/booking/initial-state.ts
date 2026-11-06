@@ -1,19 +1,5 @@
 import { PRACTICE_AREAS } from "./data";
-import type { AdminState, PortalState, SettingsState, WizardState } from "./types";
-
-function createInitialSettings(): SettingsState {
-  return {
-    photo: null,
-    firstName: "",
-    middleName: "",
-    lastName: "",
-    dob: "",
-    email: "",
-    mobile: "",
-    password: "",
-    confirmPassword: "",
-  };
-}
+import type { AdminState, PortalState, WizardState } from "./types";
 
 export function createInitialPortalState(): PortalState {
   return {
@@ -46,8 +32,6 @@ export function createInitialPortalState(): PortalState {
       { id: 1, desc: "30-min Video Consultation", amount: "$150", date: "Aug 14, 2026", status: "due" },
       { id: 2, desc: "Retainer deposit", amount: "$1,000", date: "Jul 2, 2026", status: "paid" },
     ],
-    settings: createInitialSettings(),
-    errors: {},
   };
 }
 
@@ -63,8 +47,6 @@ export function createInitialAdminState(): AdminState {
       { id: 2, name: "Amara Smith", caseType: "Business Law", urgency: "standard", attorneyId: "whitfield", conflict: true, status: "pending", reassignTo: "" },
       { id: 3, name: "Luis Herrera", caseType: "Immigration", urgency: "standard", attorneyId: "ramirez", conflict: false, status: "approved", reassignTo: "" },
     ],
-    settings: createInitialSettings(),
-    errors: {},
   };
 }
 

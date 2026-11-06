@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/booking/password-input";
 import { label, portalLoginFieldStyle } from "@/lib/booking/ui";
 
 interface AdminLoginScreenProps {
@@ -72,9 +73,8 @@ export function AdminLoginScreen({
             <label htmlFor="staff-password" style={label}>
               Password
             </label>
-            <input
+            <PasswordInput
               id="staff-password"
-              type="password"
               autoComplete="current-password"
               required
               value={loginPassword}
