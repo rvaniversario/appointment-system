@@ -37,15 +37,20 @@ export function useHeaderUserMenu() {
       }
       const { data: profile } = await supabase
         .from("profiles")
-        .select("email, role, first_name, last_name")
+        .select("email, first_name, last_name")
         .eq("id", claims.sub)
         .single();
+      const { data: membership, error: membershipError } = await supabase
+        .from("firm_memberships")
+        .select("role")
+        .eq("profile_id", claims.sub)
+        .maybeSingle();
       if (!active) return;
-      if (!profile) {
+      if (!profile || membershipError) {
         setAccount(null);
         return;
       }
-      const isClient = profile.role === "client";
+      const isClient = membership === null;
       // Staff only count as signed in after completing two-factor authentication.
       if (!isClient && claims.aal !== "aal2") {
         setAccount(null);

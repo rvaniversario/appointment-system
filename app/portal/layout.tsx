@@ -6,7 +6,7 @@ export const metadata = { robots: { index: false, follow: false } };
 
 export default async function PortalLayout({ children }: LayoutProps<"/portal">) {
   const session = await getSessionAccount();
-  const account = session && session.role === "client" ? await toAccountProfile(session) : null;
+  const account = session ? await toAccountProfile(session) : null;
 
   return (
     <PortalSessionProvider account={account}>

@@ -4,14 +4,18 @@ import { redirect } from "next/navigation";
 import { formatMobile } from "@/lib/profile/mobile";
 import type { AccountProfile } from "@/lib/profile/types";
 import { createClient } from "@/lib/supabase/server";
-import type { UserRole } from "@/lib/supabase/database.types";
+import type { FirmRole } from "@/lib/supabase/database.types";
 
-export type StaffRole = Exclude<UserRole, "client">;
+/** A firm member's role, or "client" for everyone without a firm membership. */
+export type UserRole = FirmRole | "client";
+export type StaffRole = FirmRole;
 
 export interface SessionAccount {
   id: string;
   email: string;
   role: UserRole;
+  /** The firm this account works for. Null for clients. */
+  firmId: string | null;
   firstName: string;
   middleName: string;
   lastName: string;
@@ -37,7 +41,7 @@ export const getSessionAccount = cache(async (): Promise<SessionAccount | null> 
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, email, role, first_name, middle_name, last_name, mobile, date_of_birth, photo_path")
+    .select("id, email, first_name, middle_name, last_name, mobile, date_of_birth, photo_path")
     .eq("id", data.claims.sub)
     .single();
   if (!profile) {
@@ -49,10 +53,25 @@ export const getSessionAccount = cache(async (): Promise<SessionAccount | null> 
     return null;
   }
 
+  const { data: membership, error: membershipError } = await supabase
+    .from("firm_memberships")
+    .select("role, firm_id")
+    .eq("profile_id", profile.id)
+    .maybeSingle();
+  if (membershipError) {
+    // Fail closed: a failed lookup must not turn a staff member into a client.
+    console.error("[auth] membership lookup failed for signed-in user", {
+      code: membershipError.code,
+      message: membershipError.message,
+    });
+    return null;
+  }
+
   return {
     id: profile.id,
     email: profile.email,
-    role: profile.role,
+    role: membership?.role ?? "client",
+    firmId: membership?.firm_id ?? null,
     firstName: profile.first_name,
     middleName: profile.middle_name,
     lastName: profile.last_name,
@@ -85,11 +104,10 @@ export async function toAccountProfile(account: SessionAccount): Promise<Account
   };
 }
 
-/** For client-portal pages. Staff are sent to their dashboard. */
+/** For client-portal pages. Open to staff too, because they can be clients of another firm. */
 export async function requireClient(): Promise<SessionAccount> {
   const account = await getSessionAccount();
   if (!account) redirect("/portal/login");
-  if (isStaffRole(account.role)) redirect("/staff/calendar");
   return account;
 }
 
@@ -107,6 +125,13 @@ export async function requireStaff(options: { manager?: boolean } = {}): Promise
   }
   if (options.manager && !isManagerRole(account.role)) redirect("/staff/calendar");
   return account;
+}
+
+/** Is this user a member of a firm? Readable before MFA, so sign-in can use it. */
+export async function isFirmMember(userId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("firm_memberships").select("role").eq("profile_id", userId).maybeSingle();
+  return data !== null;
 }
 
 export async function hasVerifiedTotp(): Promise<boolean> {

@@ -31,14 +31,21 @@ npm run dev
 Point `.env.local` at the local stack, using the values `supabase start` prints. Local auth
 emails (sign-in codes) appear in Mailpit at http://localhost:54324.
 
-Create your first staff account:
+Create your first staff account. The seed includes a fictional firm, `harlow-reyes`:
 
 ```bash
-npm run staff:create -- --email you@firm.ph --role admin --first Jane --last Reyes
+npm run staff:create -- --firm harlow-reyes --email you@firm.ph --role admin --first Jane --last Reyes
 # link to an attorney profile:  --role attorney --attorney maria-chen
+# create a new firm as well:    --firm santos-law --firm-name "Santos Law Office"
 ```
 
 Sign in at `/staff/login`. On first login you're asked to enroll an authenticator app.
+
+Run the database tests, which prove one firm can't reach another firm's data:
+
+```bash
+npm run db:test
+```
 
 ### Environment variables
 
@@ -68,9 +75,14 @@ is guarded by `server-only` so they can never be bundled into client code.
     login never creates accounts or reveals whether an email is a client.
   - Staff sign in with email + password, plus a **mandatory** TOTP authenticator app,
     which they enroll at `/staff/mfa-setup` on first login.
-- **Roles** (`profiles.role`): `client`, `attorney`, `partner`, `admin`. Users can't
-  change their own role; column grants block it. Only the service role can change roles,
-  through `scripts/create-staff-user.mjs` now and the admin UI later.
+- **Firms:** a firm is the customer, and a solo attorney is a firm of one. Every firm's data
+  is isolated by `firm_id`: RLS scopes access to the caller's firm, and composite foreign keys
+  make the database reject any row that mixes two firms. `supabase/tests/database/` tests this,
+  and CI runs those tests on every pull request.
+- **Roles** (`firm_memberships.role`): `attorney`, `partner`, `admin`. Staff belong to one
+  firm, and anyone without a membership is a client. A client can use several firms with one
+  login, and each firm sees only its own dealings with them. Only the service role can change
+  memberships, through `scripts/create-staff-user.mjs` now and the admin UI later.
 - **Double-booking** is impossible at the database level: `appointments` has a GiST
   exclusion constraint on `(attorney_id, during)` for active statuses.
 - **Supabase clients:** `lib/supabase/server.ts` (user, RLS), `lib/supabase/client.ts`
@@ -96,18 +108,25 @@ is guarded by `server-only` so they can never be bundled into client code.
    - **SMTP**: Resend. The default Supabase mailer is rate-limited and not for production.
 4. In Vercel, import the repo and set the env vars above for Preview (staging project) and
    Production (production project).
-5. Bootstrap the first admin against production with `npm run staff:create`, using the
-   production env values.
+5. Bootstrap a firm's first admin against production with `npm run staff:create`, using the
+   production env values and `--firm <slug> --firm-name "<name>"`. A fresh production database
+   starts with no firms.
 
 ## Rollout status
 
-- [x] Phase 1: Supabase foundation: schema + RLS, storage buckets, real client/staff auth with staff MFA
-- [ ] Phase 2: Directory + booking wizard on real data (slots, holds, server-side conflict check, uploads)
-- [ ] Phase 3: PayMongo checkout + webhook
-- [ ] Phase 4: Portal + staff dashboard on real data, admin attorney management
-- [ ] Phase 5: Email (Resend) + SMS (PhilSMS) notifications and reminders
-- [ ] Phase 6: Hardening (CSP, rate limits, error pages, SEO, tests, CI)
+The product is moving to a subscription service for law firms, with a separate booking page
+for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
 
-Until Phases 2–4 land, the directory, booking wizard, portal and dashboard **contents**
+- [x] Phase 1: Supabase foundation: schema + RLS, storage buckets, real client/staff auth with staff MFA
+- [x] Phase 2: Multi-tenant foundation: firms, memberships, firm-scoped RLS and storage, cross-firm tests in CI
+- [ ] Phase 3: Firm booking pages + booking wizard on real data (slots, holds, server-side conflict check, uploads)
+- [ ] Phase 4: Per-firm PayMongo checkout + webhook for consultation fees
+- [ ] Phase 5: Portal + staff dashboard on real data, staff invites, firm settings
+- [ ] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm
+- [ ] Phase 7: Firm self-service signup + platform admin
+- [ ] Phase 8: Subscriptions (PayMongo recurring billing, plan limits, lapsed-firm handling)
+- [ ] Phase 9: Hardening and launch (CSP, rate limits, error pages, SEO, E2E tests, legal documents)
+
+Until Phases 3–5 land, the directory, booking wizard, portal and dashboard **contents**
 still come from the sample data in `lib/booking/`. Only authentication and access
 control are real.
