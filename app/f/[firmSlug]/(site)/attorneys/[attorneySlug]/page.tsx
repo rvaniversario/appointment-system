@@ -1,20 +1,35 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ATTORNEYS, getAttorney } from "@/lib/booking/data";
+import { getFirmAttorney, getPublicFirm, listFirmAttorneys } from "@/lib/booking/queries";
 
-export function generateStaticParams() {
-  return ATTORNEYS.map((a) => ({ attorneyId: a.id }));
+type Props = PageProps<"/f/[firmSlug]/attorneys/[attorneySlug]">;
+
+async function load(props: Props) {
+  const { firmSlug, attorneySlug } = await props.params;
+  const firm = await getPublicFirm(firmSlug);
+  const attorney = firm ? await getFirmAttorney(firm.id, attorneySlug) : null;
+  return firm && attorney ? { firm, attorney } : null;
 }
 
-export default async function AttorneyProfilePage(props: PageProps<"/attorneys/[attorneyId]">) {
-  const { attorneyId } = await props.params;
-  const attorney = getAttorney(attorneyId);
-  if (!attorney) notFound();
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const loaded = await load(props);
+  return loaded ? { title: loaded.attorney.name } : {};
+}
+
+export default async function AttorneyProfilePage(props: Props) {
+  const loaded = await load(props);
+  if (!loaded) notFound();
+  const { firm, attorney } = loaded;
+  const basePath = `/f/${firm.slug}`;
+  // A solo practitioner's profile is the firm's home page, so there's no directory to go back to.
+  const hasDirectory = (await listFirmAttorneys(firm.id)).length > 1;
 
   return (
     <div style={{ maxWidth: 1120, margin: "0 auto", padding: "32px 32px 80px" }}>
+      {hasDirectory && (
       <Link
-        href="/attorneys"
+        href={basePath}
         style={{
           border: "none",
           background: "none",
@@ -28,6 +43,7 @@ export default async function AttorneyProfilePage(props: PageProps<"/attorneys/[
       >
         ← Back to attorneys
       </Link>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 36 }}>
         <div>
           <div
@@ -56,7 +72,7 @@ export default async function AttorneyProfilePage(props: PageProps<"/attorneys/[
             </span>
           </div>
           <Link
-            href={`/book/${attorney.id}/time`}
+            href={`${basePath}/book/${attorney.slug}/time`}
             style={{
               display: "block",
               textAlign: "center",
@@ -89,7 +105,9 @@ export default async function AttorneyProfilePage(props: PageProps<"/attorneys/[
             {attorney.name}
           </h1>
           <div style={{ fontSize: 15, color: "oklch(0.55 0.01 258)", marginBottom: 16 }}>
-            {attorney.location} · Speaks {attorney.languages.join(", ")}
+            {[attorney.location, attorney.languages.length ? `Speaks ${attorney.languages.join(", ")}` : ""]
+              .filter(Boolean)
+              .join(" · ")}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
             {attorney.practiceAreas.map((tag) => (
@@ -134,7 +152,7 @@ export default async function AttorneyProfilePage(props: PageProps<"/attorneys/[
             Bar admissions
           </h3>
           <p style={{ fontSize: 15, color: "oklch(0.4 0.01 258)", margin: "0 0 24px" }}>
-            {attorney.barAdmission}
+            {attorney.credentials || "Integrated Bar of the Philippines"}
           </p>
           <div
             style={{
@@ -146,8 +164,8 @@ export default async function AttorneyProfilePage(props: PageProps<"/attorneys/[
               color: "oklch(0.35 0.06 150)",
             }}
           >
-            Your information is encrypted and confidential. Nothing you submit is shared outside
-            this firm.
+            Your information is encrypted and confidential. Nothing you submit is shared outside{" "}
+            {firm.name}.
           </div>
         </div>
       </div>

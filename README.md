@@ -41,10 +41,14 @@ npm run staff:create -- --firm harlow-reyes --email you@firm.ph --role admin --f
 
 Sign in at `/staff/login`. On first login you're asked to enroll an authenticator app.
 
-Run the database tests, which prove one firm can't reach another firm's data:
+The seeded firm's booking page is at http://localhost:3000/f/harlow-reyes. Each firm's public
+pages live under `/f/<firm-slug>`, and a firm with one attorney goes straight to their profile.
+
+Run the tests:
 
 ```bash
-npm run db:test
+npm test          # unit tests (slot generation, Manila time)
+npm run db:test   # database tests: firm isolation, conflict checks
 ```
 
 ### Environment variables
@@ -85,6 +89,11 @@ is guarded by `server-only` so they can never be bundled into client code.
   memberships, through `scripts/create-staff-user.mjs` now and the admin UI later.
 - **Double-booking** is impossible at the database level: `appointments` has a GiST
   exclusion constraint on `(attorney_id, during)` for active statuses.
+- **Public booking** runs in server actions (`lib/booking/actions.ts`) with the service role,
+  because visitors aren't signed in. Picking a time creates a 15-minute hold, and an httpOnly
+  cookie scoped to `/f/<firm>` carries a random token whose SHA-256 hash is stored on the
+  appointment. Every later step proves ownership with that cookie. Open times are computed on
+  the server from weekly hours, leave and existing bookings, in Asia/Manila time.
 - **Supabase clients:** `lib/supabase/server.ts` (user, RLS), `lib/supabase/client.ts`
   (browser), and `lib/supabase/admin.ts` (service role, server-only).
 - **DB types:** `lib/supabase/database.types.ts`. Regenerate it with `npm run db:types`
@@ -119,7 +128,7 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
 
 - [x] Phase 1: Supabase foundation: schema + RLS, storage buckets, real client/staff auth with staff MFA
 - [x] Phase 2: Multi-tenant foundation: firms, memberships, firm-scoped RLS and storage, cross-firm tests in CI
-- [ ] Phase 3: Firm booking pages + booking wizard on real data (slots, holds, server-side conflict check, uploads)
+- [x] Phase 3: Firm booking pages + booking wizard on real data (slots, holds, server-side conflict check, uploads)
 - [ ] Phase 4: Per-firm PayMongo checkout + webhook for consultation fees
 - [ ] Phase 5: Portal + staff dashboard on real data, staff invites, firm settings
 - [ ] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm
@@ -127,6 +136,5 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
 - [ ] Phase 8: Subscriptions (PayMongo recurring billing, plan limits, lapsed-firm handling)
 - [ ] Phase 9: Hardening and launch (CSP, rate limits, error pages, SEO, E2E tests, legal documents)
 
-Until Phases 3–5 land, the directory, booking wizard, portal and dashboard **contents**
-still come from the sample data in `lib/booking/`. Only authentication and access
-control are real.
+Firm pages and booking use real data. Until Phase 5 lands, the client portal and staff
+dashboard **contents** still come from the sample data in `lib/booking/data.ts`.

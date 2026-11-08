@@ -1,18 +1,27 @@
 "use client";
 
-import { PRACTICE_AREAS } from "@/lib/booking/data";
 import type { ErrorState, IntakeState, Urgency } from "@/lib/booking/types";
-import { errorTextStyle, fieldStyle, label, primaryButton } from "@/lib/booking/ui";
+import { errorTextStyle, fieldStyle, label, primaryButtonDisabled } from "@/lib/booking/ui";
 
 interface BookIntakeScreenProps {
-  attorneyName: string;
+  firmName: string;
+  caseTypes: string[];
   intake: IntakeState;
   errors: ErrorState;
-  conflictFlagged: boolean;
+  notice: string | null;
+  pending: boolean;
   onIntakeChange: (patch: Partial<IntakeState>) => void;
-  onBackToDirectoryFromConflict: () => void;
   onSubmit: () => void;
 }
+
+const checkboxRow = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 10,
+  fontSize: 13.5,
+  color: "oklch(0.4 0.01 258)",
+  cursor: "pointer",
+} as const;
 
 const urgencyOptions: { key: Urgency; label: string }[] = [
   { key: "standard", label: "Standard" },
@@ -20,12 +29,13 @@ const urgencyOptions: { key: Urgency; label: string }[] = [
 ];
 
 export function BookIntakeScreen({
-  attorneyName,
+  firmName,
+  caseTypes,
   intake,
   errors,
-  conflictFlagged,
+  notice,
+  pending,
   onIntakeChange,
-  onBackToDirectoryFromConflict,
   onSubmit,
 }: BookIntakeScreenProps) {
   return (
@@ -42,55 +52,16 @@ export function BookIntakeScreen({
         Tell us about your situation
       </h1>
       <p style={{ fontSize: 15, color: "oklch(0.5 0.01 258)", margin: "0 0 8px" }}>
-        This information is encrypted and only visible to Harlow &amp; Reyes staff and attorneys.
+        This information is encrypted and only visible to {firmName} staff and attorneys.
       </p>
 
-      {conflictFlagged && (
-        <div
-          style={{
-            background: "oklch(0.97 0.03 25)",
-            border: "1px solid oklch(0.85 0.1 25)",
-            borderRadius: 10,
-            padding: "20px 22px",
-            margin: "20px 0",
-          }}
-        >
-          <div style={{ fontSize: 15, fontWeight: 700, color: "oklch(0.4 0.14 25)", marginBottom: 6 }}>
-            We need to check something before confirming
-          </div>
-          <div
-            style={{
-              fontSize: 14.5,
-              lineHeight: 1.6,
-              color: "oklch(0.35 0.05 25)",
-              marginBottom: 14,
-            }}
-          >
-            Based on what you&apos;ve entered, this matter may involve a potential conflict of
-            interest for {attorneyName}. This happens sometimes and doesn&apos;t affect your
-            case — a member of our team will review and match you with another available
-            attorney within one business day.
-          </div>
-          <button
-            onClick={onBackToDirectoryFromConflict}
-            style={{
-              padding: "10px 16px",
-              border: "none",
-              borderRadius: 7,
-              background: "oklch(0.4 0.14 25)",
-              color: "#fff",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Choose a different attorney
-          </button>
+      {notice && (
+        <div role="alert" style={{ ...errorTextStyle, fontSize: 14, margin: "16px 0 0" }}>
+          {notice}
         </div>
       )}
 
-      {!conflictFlagged && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 20 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 20 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
               <label style={label}>First name</label>
@@ -122,17 +93,19 @@ export function BookIntakeScreen({
                 onChange={(e) => onIntakeChange({ email: e.target.value })}
                 style={fieldStyle(errors.email)}
               />
-              {errors.email && <div style={errorTextStyle}>Required</div>}
+              {errors.email && <div style={errorTextStyle}>Enter a valid email address</div>}
             </div>
             <div>
-              <label style={label}>Phone</label>
+              <label style={label}>Mobile number</label>
               <input
                 type="tel"
+                placeholder="0917 123 4567"
+                autoComplete="tel"
                 value={intake.phone}
                 onChange={(e) => onIntakeChange({ phone: e.target.value })}
                 style={fieldStyle(errors.phone)}
               />
-              {errors.phone && <div style={errorTextStyle}>Required</div>}
+              {errors.phone && <div style={errorTextStyle}>Enter a Philippine mobile number</div>}
             </div>
           </div>
           <div>
@@ -140,21 +113,18 @@ export function BookIntakeScreen({
             <select
               value={intake.caseType}
               onChange={(e) => onIntakeChange({ caseType: e.target.value })}
-              style={{
-                padding: "10px 12px",
-                border: "1px solid oklch(0.85 0.005 90)",
-                borderRadius: 7,
-                fontSize: 14,
-                background: "#fff",
-                width: "100%",
-              }}
+              style={{ ...fieldStyle(errors.caseType), background: "#fff" }}
             >
-              {PRACTICE_AREAS.map((pa) => (
+              <option value="" disabled>
+                Choose one
+              </option>
+              {caseTypes.map((pa) => (
                 <option key={pa} value={pa}>
                   {pa}
                 </option>
               ))}
             </select>
+            {errors.caseType && <div style={errorTextStyle}>Required</div>}
           </div>
           <div>
             <label style={label}>How urgent is this?</label>
@@ -212,16 +182,7 @@ export function BookIntakeScreen({
               party.
             </div>
           </div>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 10,
-              fontSize: 13.5,
-              color: "oklch(0.4 0.01 258)",
-              cursor: "pointer",
-            }}
-          >
+          <label style={checkboxRow}>
             <input
               type="checkbox"
               checked={intake.ack}
@@ -232,12 +193,31 @@ export function BookIntakeScreen({
             relationship.
           </label>
           {errors.ack && <div style={errorTextStyle}>Please confirm this to continue</div>}
+          <label style={checkboxRow}>
+            <input
+              type="checkbox"
+              checked={intake.privacyConsent}
+              onChange={(e) => onIntakeChange({ privacyConsent: e.target.checked })}
+              style={{ marginTop: 2 }}
+            />
+            I consent to {firmName} collecting and processing my personal information to evaluate
+            my matter and schedule this consultation, under the Data Privacy Act of 2012 (RA 10173).
+          </label>
+          {errors.privacyConsent && <div style={errorTextStyle}>Your consent is needed to book online</div>}
+          <label style={checkboxRow}>
+            <input
+              type="checkbox"
+              checked={intake.smsOptIn}
+              onChange={(e) => onIntakeChange({ smsOptIn: e.target.checked })}
+              style={{ marginTop: 2 }}
+            />
+            Send me appointment reminders by text message (optional).
+          </label>
 
-          <button onClick={onSubmit} style={{ ...primaryButton, marginTop: 8 }}>
-            Continue →
+          <button disabled={pending} onClick={onSubmit} style={primaryButtonDisabled(pending)}>
+            {pending ? "Saving…" : "Continue →"}
           </button>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

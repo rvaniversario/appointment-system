@@ -1,18 +1,21 @@
 "use client";
 
-import { getNext7Days } from "@/lib/booking/data";
 import { BookTimeScreen } from "@/components/booking/screens/book-time-screen";
 import { useWizard } from "@/components/booking/wizard/wizard-context";
 
 export default function TimeStepPage() {
-  const { attorney, state, setConsultType, setDate, setTime, goToIntake } = useWizard();
+  const { attorney, consultTypes, state, slots, setConsultType, showWeek, setDate, setTime, goToIntake } = useWizard();
 
   return (
     <BookTimeScreen
-      attorney={attorney}
+      attorneyName={attorney.name}
+      consultTypes={consultTypes}
       booking={state.booking}
-      days={getNext7Days()}
+      slots={slots}
+      notice={state.notice}
+      pending={state.pending}
       onSetConsultType={setConsultType}
+      onShowWeek={showWeek}
       onSetDate={setDate}
       onSetTime={setTime}
       onContinue={goToIntake}
