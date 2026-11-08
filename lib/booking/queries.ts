@@ -24,17 +24,19 @@ const ACTIVE_STATUSES = ["held", "pending_payment", "confirmed"] as const;
 export const getPublicFirm = cache(async (slug: string): Promise<PublicFirm | null> => {
   const { data } = await createPublicClient()
     .from("firms")
-    .select("id, slug, name")
+    .select("id, slug, name, logo_path")
     .eq("slug", slug)
     .eq("status", "active")
     .maybeSingle();
-  return data;
+  return data ? { id: data.id, slug: data.slug, name: data.name, logoUrl: publicFile("firm-logos", data.logo_path) } : null;
 });
 
-function photoUrl(path: string | null): string | null {
+/** A file in one of the public buckets (attorney photos, firm logos). */
+function publicFile(bucket: "attorney-photos" | "firm-logos", path: string | null): string | null {
   if (!path) return null;
-  return `${publicEnv.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/attorney-photos/${path}`;
+  return `${publicEnv.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
 }
+const photoUrl = (path: string | null) => publicFile("attorney-photos", path);
 
 /** The firm's active attorneys, ordered by name. */
 export const listFirmAttorneys = cache(async (firmId: string): Promise<PublicAttorney[]> => {
@@ -65,10 +67,10 @@ export const listFirmAttorneys = cache(async (firmId: string): Promise<PublicAtt
   }));
 });
 
-/** The firm's own consultation agreement, or null for the standard one. */
-export const getFirmAgreementText = cache(async (firmId: string): Promise<string | null> => {
-  const { data } = await createPublicClient().from("firms").select("agreement_text").eq("id", firmId).maybeSingle();
-  return data?.agreement_text ?? null;
+/** What the consultation agreement is built from: the firm's own text (null for the standard one) and its cutoff. */
+export const getFirmAgreementSettings = cache(async (firmId: string): Promise<{ agreementText: string | null; cutoffHours: number }> => {
+  const { data } = await createPublicClient().from("firms").select("agreement_text, cancellation_cutoff_hours").eq("id", firmId).maybeSingle();
+  return { agreementText: data?.agreement_text ?? null, cutoffHours: data?.cancellation_cutoff_hours ?? 24 };
 });
 
 export async function getFirmAttorney(firmId: string, slug: string): Promise<PublicAttorney | null> {

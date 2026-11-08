@@ -126,7 +126,7 @@ It ships as three PRs, each branched off master:
 | --- | --- |
 | 5a: client portal (done) | Appointments, messages, documents, invoices, SMS opt-in |
 | 5b: staff dashboard (done) | Calendar, intake queue, conflicts, analytics, meeting links, availability, staff side of messages and documents |
-| 5c: firm settings and staff | Settings listed above, staff invites, attorney management |
+| 5c: firm settings and staff (done) | Settings listed above, staff invites, attorney management |
 
 Decisions:
 - **Staff invites** are one-time links, valid for 7 days, that a partner or admin copies and sends
@@ -181,6 +181,33 @@ Decisions:
   - Analytics run in app code rather than SQL views. That's fine at a firm's volume; revisit if
     pages slow down.
   - Linking a staff account to an attorney profile still uses `npm run staff:create` (5c).
+
+5c details:
+- Firm settings (partners and admins): name, contact details, logo, cancellation cutoff and
+  consultation agreement. The standard agreement now states the firm's own cutoff, and every
+  signature still records which exact text was signed.
+- Consultation types: add, edit, hide, reorder. Paid types cost at least ₱20 (PayMongo's
+  minimum). Booked types can be hidden but not deleted.
+- Offices: add, edit, delete. Attorneys at a deleted office have no office until reassigned.
+- Attorneys: partners and admins add and edit profiles, photos and the linked staff account.
+  An attorney edits only their own bio, practice areas, languages, meeting link and photo
+  (`update_own_attorney_profile()`). Photos and logos now show on the public pages.
+- Staff invites are one-time links valid for 7 days; only a SHA-256 of the token is stored.
+  - A new email gets its account from the link, then sets up MFA.
+  - An email that already has an account must confirm it with an emailed code (or be signed in
+    as it), so a leaked link can't take over someone else's account.
+  - An invite can link the new member to an attorney profile.
+- Roles can be changed and members removed. The firm always keeps a partner or admin, and
+  nobody changes their own role or removes themselves. Removed members keep no staff access;
+  their attorney profile and past records stay with the firm.
+- Carried forward from 5c:
+  - Invite links are copied and sent by hand; Phase 6 emails them.
+  - A firm's booking page address (slug) can't be changed yet. That belongs with platform admin
+    (Phase 7), since shared links would break.
+  - Branding is the logo only; colours and taglines are fixed.
+  - Booking lead time, slot length and the 60-day window are still the same for every firm.
+  - `npm run staff:create` remains for operators creating a new firm's first admin until
+    self-service signup (Phase 7).
 
 ## Phase 6: Notifications
 As in the original plan, plus:

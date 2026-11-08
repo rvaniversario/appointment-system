@@ -66,6 +66,23 @@ export interface Database {
         "profile_id" | "firm_id" | "role"
       >;
       platform_admins: Table<{ profile_id: Uuid; created_at: Ts }, "profile_id">;
+      staff_invites: Table<
+        {
+          id: Uuid;
+          firm_id: Uuid;
+          email: string;
+          role: FirmRole;
+          attorney_id: Uuid | null;
+          token_hash: string;
+          invited_by: Uuid | null;
+          created_at: Ts;
+          expires_at: Ts;
+          accepted_at: Ts | null;
+          accepted_by: Uuid | null;
+          revoked_at: Ts | null;
+        },
+        "firm_id" | "email" | "role" | "token_hash" | "expires_at"
+      >;
       offices: Table<
         { id: Uuid; firm_id: Uuid; name: string; address: string; is_remote: boolean; created_at: Ts },
         "firm_id" | "name"
@@ -322,6 +339,10 @@ export interface Database {
       firm_accepts_payments: { Args: { p_firm: Uuid }; Returns: boolean };
       mark_thread_read: { Args: { p_thread: Uuid }; Returns: undefined };
       replace_weekly_hours: { Args: { p_attorney: Uuid; p_hours: Json }; Returns: undefined };
+      update_own_attorney_profile: {
+        Args: { p_bio: string; p_practice_areas: string[]; p_languages: string[]; p_meeting_url: string | null };
+        Returns: undefined;
+      };
       search_conflict_parties: {
         Args: { p_query: string };
         Returns: { id: Uuid; name: string; matter: string; attorney_id: Uuid | null; similarity: number }[];

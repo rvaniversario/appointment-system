@@ -81,26 +81,31 @@ export function Header({
           style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}
           onClick={onGoHome}
         >
-          <div
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 8,
-              background: "oklch(0.28 0.05 258)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          {brand.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- firm logos come from storage at any size
+            <img src={brand.logoUrl} alt="" style={{ height: 38, maxWidth: 120, objectFit: "contain", display: "block" }} />
+          ) : (
             <div
               style={{
-                width: 16,
-                height: 16,
-                border: "2px solid oklch(0.72 0.1 85)",
-                borderRadius: "50%",
+                width: 38,
+                height: 38,
+                borderRadius: 8,
+                background: "oklch(0.28 0.05 258)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
-          </div>
+            >
+              <div
+                style={{
+                  width: 16,
+                  height: 16,
+                  border: "2px solid oklch(0.72 0.1 85)",
+                  borderRadius: "50%",
+                }}
+              />
+            </div>
+          )}
           <div>
             <div
               style={{

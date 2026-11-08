@@ -23,7 +23,7 @@ export default async function StaffDashboardLayout({ children }: LayoutProps<"/s
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "210px 1fr", gap: 32 }}>
-        <StaffNav isManager={ctx.isManager} queueCount={queueCount} />
+        <StaffNav isManager={ctx.isManager} queueCount={queueCount} ownAttorneyId={ctx.attorneyId} />
         <div style={{ minWidth: 0 }}>{children}</div>
       </div>
     </div>

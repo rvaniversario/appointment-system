@@ -5,6 +5,7 @@ export interface PublicFirm {
   id: string;
   slug: string;
   name: string;
+  logoUrl: string | null;
 }
 
 export interface PublicAttorney {

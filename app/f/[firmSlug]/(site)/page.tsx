@@ -1,3 +1,4 @@
+import { AttorneyPhoto } from "@/components/firm/attorney-photo";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DirectoryFilters } from "@/components/booking/directory-filters";
@@ -89,29 +90,7 @@ export default async function FirmDirectoryPage(props: PageProps<"/f/[firmSlug]"
               flexDirection: "column",
             }}
           >
-            <div
-              style={{
-                height: 150,
-                background:
-                  "repeating-linear-gradient(135deg, oklch(0.93 0.01 258), oklch(0.93 0.01 258) 12px, oklch(0.97 0.005 90) 12px, oklch(0.97 0.005 90) 24px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: 11,
-                  color: "oklch(0.5 0.01 258)",
-                  background: "#fff",
-                  padding: "3px 8px",
-                  borderRadius: 4,
-                }}
-              >
-                attorney photo
-              </span>
-            </div>
+            <AttorneyPhoto url={a.photoUrl} name={a.name} height={150} />
             <div
               style={{
                 padding: "18px 20px",
