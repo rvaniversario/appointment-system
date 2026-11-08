@@ -10,7 +10,9 @@ interface BookPaymentScreenProps {
   isFreeConsult: boolean;
   notice: string | null;
   pending: boolean;
+  acceptsPayments: boolean;
   onConfirm: () => void;
+  onPay: () => void;
 }
 
 const panel = {
@@ -28,7 +30,9 @@ export function BookPaymentScreen({
   isFreeConsult,
   notice,
   pending,
+  acceptsPayments,
   onConfirm,
+  onPay,
 }: BookPaymentScreenProps) {
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "36px 32px 80px" }}>
@@ -72,11 +76,17 @@ export function BookPaymentScreen({
           Nothing is due today. If you&apos;d like to pursue representation afterward, fees will be discussed
           before any charges apply.
         </div>
+      ) : acceptsPayments ? (
+        <div style={{ ...panel, background: "#fff", border: "1px solid oklch(0.9 0.005 90)", color: "oklch(0.4 0.01 258)" }}>
+          You&apos;ll pay on PayMongo&apos;s secure checkout by card, GCash, Maya or QR Ph. Payment goes directly to{" "}
+          {firmName}. Your time is held for 30 minutes while you pay, and your booking is confirmed as soon as the
+          payment goes through.
+        </div>
       ) : (
         <div style={{ ...panel, background: "oklch(0.97 0.03 85)", border: "1px solid oklch(0.88 0.07 85)", color: "oklch(0.38 0.06 70)" }}>
-          Online payment isn&apos;t available yet, so this consultation can&apos;t be booked online. Please contact{" "}
-          {firmName} to book it, or go back and choose a free consultation if one is offered. The time you picked
-          will be released automatically.
+          {firmName} doesn&apos;t take online payments yet, so this consultation can&apos;t be booked online. Please
+          contact the firm to book it, or go back and choose a free consultation if one is offered. The time you
+          picked will be released automatically.
         </div>
       )}
 
@@ -89,6 +99,11 @@ export function BookPaymentScreen({
       {isFreeConsult && (
         <button disabled={pending} onClick={onConfirm} style={{ ...primaryButtonDisabled(pending), marginTop: 14 }}>
           {pending ? "Confirming…" : "Confirm free consultation"}
+        </button>
+      )}
+      {!isFreeConsult && acceptsPayments && (
+        <button disabled={pending} onClick={onPay} style={{ ...primaryButtonDisabled(pending), marginTop: 14 }}>
+          {pending ? "Opening secure checkout…" : `Pay ${booking.priceLabel} securely`}
         </button>
       )}
     </div>

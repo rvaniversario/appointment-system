@@ -6,6 +6,9 @@ import { buildAgreement } from "@/lib/booking/agreement";
 import { getConsultTypes, getFirmAgreementText, getFirmAttorney, getPublicFirm, getSlotPage } from "@/lib/booking/queries";
 import { getSessionAccount } from "@/lib/auth/session";
 import { formatMobile } from "@/lib/profile/mobile";
+import { getResumableBooking } from "@/lib/booking/resume";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { paymentsConfigured } from "@/lib/env.server";
 
 type Props = LayoutProps<"/f/[firmSlug]/book/[attorneySlug]">;
 
@@ -17,16 +20,24 @@ export default async function BookAttorneyLayout(props: Props) {
   const attorney = firm ? await getFirmAttorney(firm.id, attorneySlug) : null;
   if (!firm || !attorney) notFound();
 
-  const [consultTypes, agreementText, session] = await Promise.all([
+  const [consultTypes, agreementText, session, resume, { data: acceptsPayments }] = await Promise.all([
     getConsultTypes(firm.id),
     getFirmAgreementText(firm.id),
     getSessionAccount(),
+    getResumableBooking(firm.id, attorney.id),
+    createAdminClient().rpc("firm_accepts_payments", { p_firm: firm.id }),
   ]);
   const agreement = buildAgreement({ name: firm.name, agreementText });
   // With only one consultation type there's nothing to choose, so show its times right away.
   const initialSlots =
     consultTypes.length === 1
       ? await getSlotPage({ attorneyId: attorney.id, durationMinutes: consultTypes[0].durationMinutes })
+      : null;
+  // Re-opening a booking in progress shows the week of its chosen time.
+  const resumeType = resume && consultTypes.find((c) => c.id === resume.consultTypeId);
+  const resumeSlots =
+    resume && resumeType
+      ? await getSlotPage({ attorneyId: attorney.id, durationMinutes: resumeType.durationMinutes, fromDate: resume.date })
       : null;
 
   // Signed-in clients don't retype what their profile already has.
@@ -41,7 +52,9 @@ export default async function BookAttorneyLayout(props: Props) {
       consultTypes={consultTypes}
       agreementParagraphs={agreement.paragraphs}
       prefill={prefill}
-      initialSlots={initialSlots}
+      initialSlots={resumeSlots ?? initialSlots}
+      resume={resume}
+      acceptsPayments={Boolean(acceptsPayments) && paymentsConfigured()}
     >
       <WizardChrome>{props.children}</WizardChrome>
     </BookingWizardProvider>

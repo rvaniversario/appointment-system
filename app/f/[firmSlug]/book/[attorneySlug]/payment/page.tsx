@@ -5,7 +5,7 @@ import { BookPaymentScreen } from "@/components/booking/screens/book-payment-scr
 import { useWizard } from "@/components/booking/wizard/wizard-context";
 
 export default function PaymentStepPage() {
-  const { firm, attorney, consultTypes, selectedConsultType, state, confirmBooking } = useWizard();
+  const { firm, attorney, consultTypes, selectedConsultType, state, acceptsPayments, confirmBooking, payNow } = useWizard();
 
   return (
     <BookPaymentScreen
@@ -15,7 +15,9 @@ export default function PaymentStepPage() {
       isFreeConsult={selectedConsultType?.priceCentavos === 0}
       notice={state.notice}
       pending={state.pending}
+      acceptsPayments={acceptsPayments}
       onConfirm={confirmBooking}
+      onPay={payNow}
     />
   );
 }

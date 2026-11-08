@@ -1,21 +1,11 @@
-"use client";
-
-import { AdminScreen } from "@/components/booking/screens/admin-screen";
-import { useStaffSession } from "@/components/staff/staff-session-context";
+import { FirmPayments } from "@/components/staff/firm-payments";
+import { BillingSample } from "@/components/staff/billing-sample";
 
 export default function StaffBillingPage() {
-  const { state, days, onAdminConflictSearch: onConflictSearchChange, setLeadReassign, reassignLead, approveLead } =
-    useStaffSession();
-
   return (
-    <AdminScreen
-      activeTab="billing"
-      admin={state}
-      days={days}
-      onConflictSearchChange={onConflictSearchChange}
-      onLeadReassignChange={setLeadReassign}
-      onReassignLead={reassignLead}
-      onApproveLead={approveLead}
-    />
+    <>
+      <FirmPayments />
+      <BillingSample />
+    </>
   );
 }

@@ -4,7 +4,8 @@ import { BookTimeScreen } from "@/components/booking/screens/book-time-screen";
 import { useWizard } from "@/components/booking/wizard/wizard-context";
 
 export default function TimeStepPage() {
-  const { attorney, consultTypes, state, slots, setConsultType, showWeek, setDate, setTime, goToIntake } = useWizard();
+  const { attorney, consultTypes, state, slots, acceptsPayments, setConsultType, showWeek, setDate, setTime, goToIntake } =
+    useWizard();
 
   return (
     <BookTimeScreen
@@ -14,6 +15,7 @@ export default function TimeStepPage() {
       slots={slots}
       notice={state.notice}
       pending={state.pending}
+      acceptsPayments={acceptsPayments}
       onSetConsultType={setConsultType}
       onShowWeek={showWeek}
       onSetDate={setDate}
