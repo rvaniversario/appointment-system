@@ -14,6 +14,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # Same npm as local development, so the lock file it writes is the one CI reads.
+      - run: npm install -g npm@11.6.2
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -35,6 +37,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # Same npm as local development, so the lock file it writes is the one CI reads.
+      - run: npm install -g npm@11.6.2
       - run: npm ci
       - run: npx supabase start -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
       - run: npm run db:test
