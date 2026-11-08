@@ -16,7 +16,7 @@ export function FirmSiteChrome({ firm, children }: { firm: PublicFirm; children:
   return (
     <>
       <Header
-        brand={firmBrand(firm.name)}
+        brand={firmBrand(firm)}
         onGoHome={() => router.push(`/f/${firm.slug}`)}
         stepper={null}
         userMenu={userMenu}

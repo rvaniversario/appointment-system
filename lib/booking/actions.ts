@@ -407,9 +407,9 @@ export async function signAgreement(input: { firmSlug: string; signatureName: st
   if (signature.length < 2 || signature.length > 200) return fail("Type your full name to sign.");
 
   const admin = createAdminClient();
-  const { data: firm } = await admin.from("firms").select("name, agreement_text").eq("id", live.firmId).single();
+  const { data: firm } = await admin.from("firms").select("name, agreement_text, cancellation_cutoff_hours").eq("id", live.firmId).single();
   if (!firm) return fail(GENERIC);
-  const agreement = buildAgreement({ name: firm.name, agreementText: firm.agreement_text });
+  const agreement = buildAgreement({ name: firm.name, agreementText: firm.agreement_text, cutoffHours: firm.cancellation_cutoff_hours });
 
   const h = await headers();
   await admin.from("agreements").delete().eq("appointment_id", live.booking.id);

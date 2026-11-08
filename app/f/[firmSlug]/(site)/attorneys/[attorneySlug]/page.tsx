@@ -1,3 +1,4 @@
+import { AttorneyPhoto } from "@/components/firm/attorney-photo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -46,31 +47,7 @@ export default async function AttorneyProfilePage(props: Props) {
       )}
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 36 }}>
         <div>
-          <div
-            style={{
-              height: 280,
-              borderRadius: 14,
-              background:
-                "repeating-linear-gradient(135deg, oklch(0.93 0.01 258), oklch(0.93 0.01 258) 12px, oklch(0.97 0.005 90) 12px, oklch(0.97 0.005 90) 24px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 16,
-            }}
-          >
-            <span
-              style={{
-                fontFamily: "monospace",
-                fontSize: 11,
-                color: "oklch(0.5 0.01 258)",
-                background: "#fff",
-                padding: "3px 8px",
-                borderRadius: 4,
-              }}
-            >
-              attorney photo
-            </span>
-          </div>
+          <AttorneyPhoto url={attorney.photoUrl} name={attorney.name} height={280} radius={14} marginBottom={16} />
           <Link
             href={`${basePath}/book/${attorney.slug}/time`}
             style={{

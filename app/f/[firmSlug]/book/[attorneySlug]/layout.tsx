@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { BookingWizardProvider } from "@/components/booking/wizard/wizard-context";
 import { WizardChrome } from "@/components/booking/wizard/wizard-chrome";
 import { buildAgreement } from "@/lib/booking/agreement";
-import { getConsultTypes, getFirmAgreementText, getFirmAttorney, getPublicFirm, getSlotPage } from "@/lib/booking/queries";
+import { getConsultTypes, getFirmAgreementSettings, getFirmAttorney, getPublicFirm, getSlotPage } from "@/lib/booking/queries";
 import { getSessionAccount } from "@/lib/auth/session";
 import { formatMobile } from "@/lib/profile/mobile";
 import { getResumableBooking } from "@/lib/booking/resume";
@@ -20,14 +20,14 @@ export default async function BookAttorneyLayout(props: Props) {
   const attorney = firm ? await getFirmAttorney(firm.id, attorneySlug) : null;
   if (!firm || !attorney) notFound();
 
-  const [consultTypes, agreementText, session, resume, { data: acceptsPayments }] = await Promise.all([
+  const [consultTypes, agreementSettings, session, resume, { data: acceptsPayments }] = await Promise.all([
     getConsultTypes(firm.id),
-    getFirmAgreementText(firm.id),
+    getFirmAgreementSettings(firm.id),
     getSessionAccount(),
     getResumableBooking(firm.id, attorney.id),
     createAdminClient().rpc("firm_accepts_payments", { p_firm: firm.id }),
   ]);
-  const agreement = buildAgreement({ name: firm.name, agreementText });
+  const agreement = buildAgreement({ name: firm.name, ...agreementSettings });
   // With only one consultation type there's nothing to choose, so show its times right away.
   const initialSlots =
     consultTypes.length === 1

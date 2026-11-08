@@ -5,13 +5,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { hasVerifiedTotp, isFirmMember, requireStaff } from "@/lib/auth/session";
 import type { ActionResult } from "@/app/portal/actions";
+import { newPasswordSchema, PASSWORD_POLICY_ERROR } from "@/lib/auth/password";
 
 const GENERIC_LOGIN_ERROR = "Incorrect email or password.";
 const codeSchema = z.string().trim().regex(/^\d{6}$/);
-// Mirrors the Supabase Auth password policy; 72 is the bcrypt limit Supabase enforces.
-const newPasswordSchema = z.string().min(12).max(72).regex(/[a-z]/).regex(/[A-Z]/).regex(/\d/);
-const PASSWORD_POLICY_ERROR =
-  "Use 12 to 72 characters with at least one uppercase letter, one lowercase letter and one number.";
 
 export async function staffSignIn(email: string, password: string): Promise<ActionResult> {
   const parsed = z

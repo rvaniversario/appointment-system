@@ -49,7 +49,7 @@ export function WizardChrome({ children }: { children: ReactNode }) {
       }}
     >
       <Header
-        brand={firmBrand(firm.name)}
+        brand={firmBrand(firm)}
         onGoHome={() => router.push(basePath)}
         stepper={stepper}
         userMenu={userMenu}

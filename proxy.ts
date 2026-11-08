@@ -46,7 +46,9 @@ export async function proxy(request: NextRequest) {
 
   if (!signedIn) {
     if (pathname.startsWith("/portal") && !PUBLIC_PORTAL.includes(pathname)) return redirectTo("/portal/login");
-    if (pathname.startsWith("/staff") && !PUBLIC_STAFF.includes(pathname)) return redirectTo("/staff/login");
+    if (pathname.startsWith("/staff") && !PUBLIC_STAFF.includes(pathname) && !pathname.startsWith("/staff/invite/")) {
+      return redirectTo("/staff/login");
+    }
   }
 
   return response;

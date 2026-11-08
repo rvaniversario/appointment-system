@@ -10,6 +10,12 @@ export const PLATFORM = {
 export interface Brand {
   name: string;
   tagline: string;
+  /** The firm's uploaded logo, shown in place of the default mark. */
+  logoUrl?: string | null;
 }
 
-export const firmBrand = (firmName: string): Brand => ({ name: firmName, tagline: "Attorneys at Law" });
+export const firmBrand = (firm: { name: string; logoUrl?: string | null }): Brand => ({
+  name: firm.name,
+  tagline: "Attorneys at Law",
+  logoUrl: firm.logoUrl ?? null,
+});

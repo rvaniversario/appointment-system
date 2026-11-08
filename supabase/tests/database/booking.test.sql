@@ -34,11 +34,14 @@ insert into public.intakes (firm_id, appointment_id, first_name, last_name, emai
 
 select is(public.run_conflict_check('3a000000-0000-4000-8000-000000000001'), 2, 'finds both the client and the opposing party');
 select is(
-  (select array_agg(p.name order by p.name) from public.conflict_hits h join public.conflict_parties p on p.id = h.conflict_party_id),
+  (select array_agg(p.name order by p.name) from public.conflict_hits h join public.conflict_parties p on p.id = h.conflict_party_id
+   where h.appointment_id = '3a000000-0000-4000-8000-000000000001'),
   array['Amara Smith', 'Kevin Park'],
   'fuzzy-matches names and ignores unrelated parties'
 );
-select is((select count(*)::int from public.conflict_hits where firm_id <> 'f0000000-0000-4000-8000-00000000000a'), 0,
+select is((select count(*)::int from public.conflict_hits h join public.conflict_parties p on p.id = h.conflict_party_id
+           where h.appointment_id = '3a000000-0000-4000-8000-000000000001'
+             and p.firm_id <> 'f0000000-0000-4000-8000-00000000000a'), 0,
   'never matches another firm''s parties');
 select is(public.run_conflict_check('3a000000-0000-4000-8000-000000000001'), 0, 'running it again adds no duplicates');
 
