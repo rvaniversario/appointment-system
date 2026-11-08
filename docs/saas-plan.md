@@ -85,19 +85,33 @@ The riskiest phase. Nothing else ships on the old security model.
   - Attorney photos still show a placeholder until firm settings (Phase 5) can upload them.
   - The product name in `lib/brand.ts` is a placeholder.
 
-## Phase 4: Consultation fee payments (per firm)
-- **Start with a short spike on connecting firm accounts:**
-  1. Preferred: PayMongo **Linked Accounts** (formerly Platforms), so firms are onboarded under our
-     parent account and we never store their keys. Confirm with PayMongo that funds settle to the
-     firm and we aren't treated as holding them, that hosted checkout and refunds work, and what
-     it costs.
-  2. Fallback: each firm enters its own API keys, encrypted at rest and never returned to the
-     browser, with a webhook registered per firm.
-- Don't configure any split that pays us a share of a fee.
+## Phase 4: Consultation fee payments (per firm) (done)
+- **Decided: PayMongo Linked Accounts.** PayMongo confirmed that payments made on a firm's behalf
+  settle to the firm's own (child) account, which stays merchant of record. Checkout and refunds
+  run with our parent secret key plus an `Account-ID: org_…` header. There are no per-firm fees,
+  and existing PayMongo accounts can be invited and linked. We never hold firms' keys or funds.
+  - Firms connect by accepting our linking invitation (existing account) or by being created
+    through the Accounts API (new account). Store only the firm's `org_…` id and link status.
+  - The policy contract must grant checkout, payment and refund access for the child.
+  - Webhooks are registered per child account until PayMongo ships a consolidated parent webhook.
+  - Confirm early in testing that checkout sessions accept the `Account-ID` header.
+- Don't configure PayMongo's optional fee split: we take no share of consultation fees.
 - Checkout session and webhook per the original plan, with `/api/webhooks/paymongo/[firmId]` if the
   fallback is used. Signature check, idempotent processing, refunds by partners.
 - Firms with no connected account can offer only free consultations.
 - Add a daily reconciliation job: **PayMongo does not resend missed webhooks.**
+- Carried forward from this phase:
+  - Built and tested against a local mock of PayMongo. Fields the API reference left unstated
+    (the checkout URL, the webhook's `secret_key`, the invitation response, the payment-methods
+    endpoint) still need checking against real test-mode responses.
+  - The invitation API is marked "coming soon" in PayMongo's docs. If it isn't live, link firms
+    from the PayMongo dashboard and record them with `--account org_…`.
+  - Linking and its webhooks only work in live mode, so the full flow needs one small live
+    payment, refunded afterwards, against a firm account we control.
+  - Firms are connected by an operator script; self-service connection belongs in Phase 7.
+  - Refunds are full only. Refund status updates from PayMongo are recorded only as "refunded".
+  - A payment that arrives after its time was given away is flagged "refund due" on Billing;
+    the firm isn't notified until Phase 6.
 
 ## Phase 5: Portal and staff dashboard on real data
 As in the original plan, firm-scoped, plus:

@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { syncPendingPayment } from "@/lib/payments/settle";
 import { getBookingFromCookie } from "./session";
 import { formatDateLabel, formatTimeLabel, manilaDate } from "./time";
 
@@ -16,6 +17,44 @@ export interface ConfirmedBooking {
   timeLabel: string;
   meetingUrl: string | null;
   officeAddress: string | null;
+}
+
+export type PaymentState = "none" | "processing" | "paid_but_released";
+
+/**
+ * For a booking waiting on payment, asks PayMongo directly instead of waiting for the
+ * webhook, then reports what the client should see.
+ */
+export async function refreshBookingPayment(firmId: string): Promise<PaymentState> {
+  const booking = await getBookingFromCookie(firmId);
+  if (!booking) return "none";
+  const admin = createAdminClient();
+
+  if (booking.status === "pending_payment") {
+    const { data: pending } = await admin
+      .from("payments")
+      .select("id")
+      .eq("appointment_id", booking.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (pending) {
+      try {
+        await syncPendingPayment(pending.id);
+      } catch (error) {
+        console.error("[payments] sync on confirmation failed", { message: (error as Error).message });
+      }
+    }
+  }
+
+  const [{ data: current }, { data: paid }] = await Promise.all([
+    admin.from("appointments").select("status").eq("id", booking.id).single(),
+    admin.from("payments").select("id").eq("appointment_id", booking.id).eq("status", "paid").limit(1).maybeSingle(),
+  ]);
+  if (current?.status === "pending_payment") return "processing";
+  if (current?.status === "canceled" && paid) return "paid_but_released";
+  return "none";
 }
 
 /** The visitor's confirmed booking at this firm, read via their booking cookie. */

@@ -132,7 +132,8 @@ export async function getAvailability(input: {
     ...(exceptions ?? []).map((e) => ({ startsAt: new Date(e.starts_at), endsAt: new Date(e.ends_at) })),
     ...(appointments ?? [])
       .filter((a) => a.id !== input.ignoreAppointmentId)
-      .filter((a) => !(a.status === "held" && a.hold_expires_at && new Date(a.hold_expires_at) <= now))
+      // Holds and unpaid checkouts stop blocking the time once they lapse.
+      .filter((a) => !(a.status !== "confirmed" && a.hold_expires_at && new Date(a.hold_expires_at) <= now))
       .map((a) => ({ startsAt: new Date(a.starts_at), endsAt: new Date(a.ends_at) })),
   ];
 

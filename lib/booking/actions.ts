@@ -6,6 +6,10 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionAccount } from "@/lib/auth/session";
 import { normalizeMobile } from "@/lib/profile/mobile";
+import { publicEnv } from "@/lib/env";
+import { paymentsConfigured } from "@/lib/env.server";
+import { createCheckoutSession, expireCheckoutSession, PaymongoError } from "@/lib/payments/paymongo";
+import { CHECKOUT_MINUTES } from "@/lib/payments/settle";
 import { buildAgreement } from "./agreement";
 import {
   BOOKING_RULES,
@@ -33,7 +37,7 @@ const EXPIRED = "Your reserved time has expired. Please choose a time again.";
 const GENERIC = "Something went wrong. Please try again.";
 
 const slugSchema = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(100);
-const uuidSchema = z.uuid();
+const uuidSchema = z.guid();
 
 async function resolve(firmSlug: string, attorneySlug?: string) {
   if (!slugSchema.safeParse(firmSlug).success) return null;
@@ -111,6 +115,12 @@ export async function holdSlot(input: {
   const consultType = (await getConsultTypes(firm.id)).find((c) => c.id === input.consultTypeId);
   const startsAt = new Date(input.startsAt);
   if (!consultType || Number.isNaN(startsAt.getTime())) return fail("Choose a consultation type and time.");
+  if (consultType.priceCentavos > 0) {
+    const { data: acceptsPayments } = await admin.rpc("firm_accepts_payments", { p_firm: firm.id });
+    if (!acceptsPayments || !paymentsConfigured()) {
+      return fail("This consultation can't be booked online yet. Please contact the firm.", "unavailable");
+    }
+  }
 
   // Only times the visitor could actually see are accepted.
   const existing = await getBookingFromCookie(firm.id);
@@ -129,12 +139,12 @@ export async function holdSlot(input: {
 
   const endsAt = new Date(startsAt.getTime() + consultType.durationMinutes * 60_000);
 
-  // Expired holds still count for the no-overlap constraint until released.
+  // Expired holds and unpaid checkouts still count for the no-overlap constraint until released.
   await admin
     .from("appointments")
     .update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "hold expired" })
     .eq("attorney_id", attorney.id)
-    .eq("status", "held")
+    .in("status", ["held", "pending_payment"])
     .lt("hold_expires_at", new Date().toISOString())
     .lt("starts_at", endsAt.toISOString())
     .gt("ends_at", startsAt.toISOString());
@@ -151,13 +161,15 @@ export async function holdSlot(input: {
 
   // Changing the time keeps the same booking, and whatever was already entered.
   const sameAttorney = ownHold && ownHold.attorney_id === attorney.id;
+  // A checkout for the old time must not be payable once the time changes.
+  if (ownHold?.status === "pending_payment") await cancelPendingCheckouts(ownHold.id);
   if (ownHold && !sameAttorney) {
     await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "replaced by visitor" }).eq("id", ownHold.id);
   }
 
   const { token, hash } = newBookingToken();
   const { data, error } = sameAttorney
-    ? await admin.from("appointments").update({ ...fields, booking_token_hash: hash }).eq("id", ownHold.id).select("id").single()
+    ? await admin.from("appointments").update({ ...fields, status: "held", booking_token_hash: hash }).eq("id", ownHold.id).select("id").single()
     : await admin.from("appointments").insert({ ...fields, status: "held", booking_token_hash: hash }).select("id").single();
 
   if (error?.code === "23P01") return fail("That time was just taken. Please choose another.", "taken");
@@ -439,20 +451,28 @@ export async function signAgreement(input: { firmSlug: string; signatureName: st
   return { ok: true };
 }
 
-/** Free consultations need no payment, so they're confirmed as soon as every step is done. */
-export async function confirmFreeBooking(input: { firmSlug: string }): Promise<{ ok: true } | Failure> {
-  const live = await liveBooking(input.firmSlug);
-  if (!live) return fail(EXPIRED, "expired");
-  const { booking } = live;
-  if (booking.price_centavos !== 0) return fail("Online payment isn't available yet.", "unavailable");
-
+/** Every step before payment is done. Returns an error message if not. */
+async function missingSteps(booking: BookingRow): Promise<string | null> {
   const admin = createAdminClient();
   const [{ count: intakes }, { count: agreements }] = await Promise.all([
     admin.from("intakes").select("id", { count: "exact", head: true }).eq("appointment_id", booking.id),
     admin.from("agreements").select("id", { count: "exact", head: true }).eq("appointment_id", booking.id),
   ]);
-  if (!booking.client_id || !intakes) return fail("Please complete the intake form first.");
-  if (!agreements) return fail("Please sign the consultation agreement first.");
+  if (!booking.client_id || !intakes) return "Please complete the intake form first.";
+  if (!agreements) return "Please sign the consultation agreement first.";
+  return null;
+}
+
+/** Free consultations need no payment, so they're confirmed as soon as every step is done. */
+export async function confirmFreeBooking(input: { firmSlug: string }): Promise<{ ok: true } | Failure> {
+  const live = await liveBooking(input.firmSlug);
+  if (!live) return fail(EXPIRED, "expired");
+  const { booking } = live;
+  if (booking.price_centavos !== 0) return fail("This consultation needs payment.", "unavailable");
+
+  const missing = await missingSteps(booking);
+  if (missing) return fail(missing);
+  const admin = createAdminClient();
 
   // Video consultations get the attorney's standing meeting link.
   const [{ data: consultType }, { data: attorney }] = await Promise.all([
@@ -474,4 +494,103 @@ export async function confirmFreeBooking(input: { firmSlug: string }): Promise<{
     return fail(GENERIC);
   }
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Payment
+// ---------------------------------------------------------------------------
+
+/** Expires any unfinished checkout for this booking, so it can't be paid later. */
+async function cancelPendingCheckouts(appointmentId: string) {
+  const admin = createAdminClient();
+  const { data: pending } = await admin
+    .from("payments")
+    .select("id, account_id, provider_checkout_id")
+    .eq("appointment_id", appointmentId)
+    .eq("status", "pending");
+  for (const p of pending ?? []) {
+    if (p.account_id && p.provider_checkout_id) {
+      try {
+        await expireCheckoutSession(p.account_id, p.provider_checkout_id);
+      } catch (error) {
+        console.error("[payments] could not expire checkout", { message: (error as Error).message });
+      }
+    }
+    await admin.from("payments").update({ status: "expired" }).eq("id", p.id).eq("status", "pending");
+  }
+}
+
+export type CheckoutResult = { ok: true; checkoutUrl: string } | Failure;
+
+/** Sends the client to PayMongo's hosted checkout, on the firm's own PayMongo account. */
+export async function startCheckout(input: { firmSlug: string }): Promise<CheckoutResult> {
+  const live = await liveBooking(input.firmSlug);
+  if (!live) return fail(EXPIRED, "expired");
+  const { booking, firmId } = live;
+  if (booking.price_centavos === 0) return fail("This consultation is free.");
+  const missing = await missingSteps(booking);
+  if (missing) return fail(missing);
+
+  const admin = createAdminClient();
+  const { data: account } = await admin
+    .from("firm_payment_accounts")
+    .select("account_id, status")
+    .eq("firm_id", firmId)
+    .maybeSingle();
+  if (!paymentsConfigured() || account?.status !== "active" || !account.account_id) {
+    return fail("This firm can't take online payments yet.", "unavailable");
+  }
+
+  const [{ data: intake }, { data: consultType }, { data: attorney }, { data: firm }] = await Promise.all([
+    admin.from("intakes").select("first_name, last_name, email, phone").eq("appointment_id", booking.id).single(),
+    admin.from("consult_types").select("label").eq("id", booking.consult_type_id).single(),
+    admin.from("attorneys").select("full_name, slug").eq("id", booking.attorney_id).single(),
+    admin.from("firms").select("name, slug").eq("id", firmId).single(),
+  ]);
+  if (!intake || !consultType || !attorney || !firm) return fail(GENERIC);
+
+  // One open checkout per booking: retrying replaces the previous one.
+  await cancelPendingCheckouts(booking.id);
+
+  const { data: payment, error: paymentError } = await admin
+    .from("payments")
+    .insert({
+      firm_id: firmId,
+      client_id: booking.client_id,
+      appointment_id: booking.id,
+      account_id: account.account_id,
+      amount_centavos: booking.price_centavos,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (paymentError || !payment) return fail(GENERIC);
+
+  const bookPath = `${publicEnv.NEXT_PUBLIC_SITE_URL}/f/${firm.slug}/book/${attorney.slug}`;
+  try {
+    const session = await createCheckoutSession({
+      accountId: account.account_id,
+      amountCentavos: booking.price_centavos,
+      name: consultType.label,
+      description: `${consultType.label} with ${attorney.full_name}, ${firm.name}`,
+      referenceNumber: payment.id,
+      successUrl: `${bookPath}/confirmation`,
+      cancelUrl: `${bookPath}/payment`,
+      metadata: { payment_id: payment.id, appointment_id: booking.id, firm_id: firmId },
+      billing: { name: `${intake.first_name} ${intake.last_name}`, email: intake.email, phone: `+${intake.phone}` },
+    });
+
+    await admin.from("payments").update({ provider_checkout_id: session.id }).eq("id", payment.id);
+    await admin
+      .from("appointments")
+      .update({ status: "pending_payment", hold_expires_at: new Date(Date.now() + CHECKOUT_MINUTES * 60_000).toISOString() })
+      .eq("id", booking.id)
+      .in("status", ["held", "pending_payment"]);
+    return { ok: true, checkoutUrl: session.checkoutUrl };
+  } catch (error) {
+    const message = error instanceof PaymongoError ? `${error.status} ${error.code ?? ""} ${error.message}` : String(error);
+    console.error("[payments] checkout failed", { message });
+    await admin.from("payments").update({ status: "failed", failure_reason: message.slice(0, 500) }).eq("id", payment.id);
+    return fail("We couldn't start the payment. Please try again in a moment.");
+  }
 }

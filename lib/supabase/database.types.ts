@@ -241,10 +241,30 @@ export interface Database {
           amount_centavos: number;
           currency: string;
           status: PaymentStatus;
+          account_id: string | null;
+          refunded_centavos: number;
+          provider_refund_id: string | null;
+          refunded_at: Ts | null;
+          failure_reason: string | null;
           created_at: Ts;
           updated_at: Ts;
         },
         "firm_id" | "amount_centavos"
+      >;
+      firm_payment_accounts: Table<
+        {
+          firm_id: Uuid;
+          provider: string;
+          account_id: string | null;
+          invitation_id: string | null;
+          status: "invited" | "active" | "disabled";
+          livemode: boolean;
+          webhook_id: string | null;
+          webhook_secret: string | null;
+          created_at: Ts;
+          updated_at: Ts;
+        },
+        "firm_id" | "livemode"
       >;
       webhook_events: Table<
         { id: string; provider: string; account_id: string; type: string; payload: Json; received_at: Ts },
@@ -297,6 +317,7 @@ export interface Database {
       current_attorney_id: { Args: Record<string, never>; Returns: Uuid };
       firm_can_accept_bookings: { Args: { p_firm: Uuid }; Returns: boolean };
       run_conflict_check: { Args: { p_appointment: Uuid }; Returns: number };
+      firm_accepts_payments: { Args: { p_firm: Uuid }; Returns: boolean };
     };
     Enums: {
       firm_role: FirmRole;

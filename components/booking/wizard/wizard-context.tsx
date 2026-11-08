@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useState, type ReactNode } from
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
+  startCheckout,
   confirmFreeBooking,
   confirmUpload,
   createUploadUrl,
@@ -16,6 +17,7 @@ import {
 import { createInitialWizardState } from "@/lib/booking/initial-state";
 import type { ConsultTypeOption, PublicAttorney, PublicFirm } from "@/lib/booking/public-types";
 import type { SlotPageData } from "@/lib/booking/queries";
+import type { ResumedBooking } from "@/lib/booking/resume";
 import type { DaySlots } from "@/lib/booking/slots";
 import type { ErrorKey, IntakeState, WizardState } from "@/lib/booking/types";
 
@@ -38,6 +40,8 @@ interface WizardContextValue {
   slots: SlotPage;
   selectedConsultType: ConsultTypeOption | undefined;
   basePath: string;
+  /** The firm can take online payments, so paid consultations can be booked. */
+  acceptsPayments: boolean;
   setConsultType: (id: string) => void;
   showWeek: (direction: "back" | "forward") => void;
   setDate: (date: string) => void;
@@ -52,6 +56,7 @@ interface WizardContextValue {
   onAgreementSignature: (signature: string) => void;
   submitAgreement: () => void;
   confirmBooking: () => void;
+  payNow: () => void;
   toggleCameraCheck: () => void;
   toggleMicCheck: () => void;
   finishVideoCheck: () => void;
@@ -70,6 +75,8 @@ export function BookingWizardProvider({
   agreementParagraphs,
   prefill,
   initialSlots,
+  resume,
+  acceptsPayments,
   children,
 }: {
   firm: PublicFirm;
@@ -79,13 +86,25 @@ export function BookingWizardProvider({
   prefill: { firstName?: string; lastName?: string; email?: string; phone?: string };
   /** The first week of open times, when the firm has a single consultation type. */
   initialSlots: SlotPageData | null;
+  resume: ResumedBooking | null;
+  acceptsPayments: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
   const [state, setState] = useState<WizardState>(() => {
     const initial = createInitialWizardState(prefill);
     if (consultTypes.length === 1) initial.booking.consultTypeId = consultTypes[0].id;
-    return initial;
+    if (!resume) return initial;
+    return {
+      ...initial,
+      booking: { consultTypeId: resume.consultTypeId, date: resume.date, startsAt: resume.startsAt, timeLabel: resume.timeLabel },
+      held: true,
+      intakeSaved: Boolean(resume.intake),
+      intake: { ...initial.intake, ...resume.intake },
+      documents: resume.documents,
+      agreementSigned: resume.agreementSigned,
+      agreement: { agreed: resume.agreementSigned, signature: resume.signature },
+    };
   });
   const [slots, setSlots] = useState<SlotPage>(() => (initialSlots ? { ...initialSlots, loading: false } : EMPTY_SLOTS));
   const basePath = `/f/${firm.slug}`;
@@ -235,6 +254,17 @@ export function BookingWizardProvider({
     goToStep(selectedConsultType?.mode === "video" ? "video" : "confirmation");
   };
 
+  const payNow = async () => {
+    patch({ pending: true, notice: null });
+    const result = await startCheckout({ firmSlug: firm.slug });
+    if (!result.ok) {
+      if (result.code === "expired") return restartFromTime(result.error);
+      return patch({ pending: false, notice: result.error });
+    }
+    // PayMongo's hosted checkout is a separate site, so this is a full navigation.
+    window.location.assign(result.checkoutUrl);
+  };
+
   const toggleCameraCheck = () => setState((s) => ({ ...s, cameraOk: !s.cameraOk }));
   const toggleMicCheck = () => setState((s) => ({ ...s, micOk: !s.micOk }));
   const finishVideoCheck = () => goToStep("confirmation");
@@ -251,6 +281,7 @@ export function BookingWizardProvider({
     slots,
     selectedConsultType,
     basePath,
+    acceptsPayments,
     setConsultType,
     showWeek,
     setDate,
@@ -265,6 +296,7 @@ export function BookingWizardProvider({
     onAgreementSignature,
     submitAgreement: () => void submitAgreement(),
     confirmBooking: () => void confirmBooking(),
+    payNow: () => void payNow(),
     toggleCameraCheck,
     toggleMicCheck,
     finishVideoCheck,

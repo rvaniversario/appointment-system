@@ -12,6 +12,8 @@ interface BookTimeScreenProps {
   slots: SlotPage;
   notice: string | null;
   pending: boolean;
+  /** Without online payment, paid consultation types can't be booked here. */
+  acceptsPayments: boolean;
   onSetConsultType: (id: string) => void;
   onShowWeek: (direction: "back" | "forward") => void;
   onSetDate: (date: string) => void;
@@ -28,6 +30,7 @@ export function BookTimeScreen({
   slots,
   notice,
   pending,
+  acceptsPayments,
   onSetConsultType,
   onShowWeek,
   onSetDate,
@@ -80,11 +83,13 @@ export function BookTimeScreen({
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
         {consultTypes.map((ct) => {
           const sel = booking.consultTypeId === ct.id;
+          const unavailable = ct.priceCentavos > 0 && !acceptsPayments;
           return (
             <button
               key={ct.id}
               type="button"
               aria-pressed={sel}
+              disabled={unavailable}
               onClick={() => onSetConsultType(ct.id)}
               style={{
                 display: "flex",
@@ -92,7 +97,8 @@ export function BookTimeScreen({
                 gap: 14,
                 padding: "16px 18px",
                 borderRadius: 10,
-                cursor: "pointer",
+                cursor: unavailable ? "not-allowed" : "pointer",
+                opacity: unavailable ? 0.55 : 1,
                 background: "#fff",
                 textAlign: "left",
                 font: "inherit",
@@ -112,7 +118,9 @@ export function BookTimeScreen({
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "oklch(0.25 0.01 258)" }}>{ct.label}</div>
                 <div style={{ fontSize: 13, color: "oklch(0.55 0.01 258)", marginTop: 2 }}>
-                  {[ct.description, `${ct.durationMinutes} minutes`].filter(Boolean).join(" · ")}
+                  {unavailable
+                    ? "Not bookable online yet. Please contact the firm."
+                    : [ct.description, `${ct.durationMinutes} minutes`].filter(Boolean).join(" · ")}
                 </div>
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "oklch(0.28 0.05 258)" }}>{ct.priceLabel}</div>

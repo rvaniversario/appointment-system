@@ -50,7 +50,11 @@ export async function getBookingFromCookie(firmId: string) {
 
 export type BookingRow = NonNullable<Awaited<ReturnType<typeof getBookingFromCookie>>>;
 
-/** A hold the visitor can still work on. */
+/** A hold the visitor can still work on, including one waiting for payment. */
 export function isLiveHold(booking: BookingRow, now = new Date()): boolean {
-  return booking.status === "held" && !!booking.hold_expires_at && new Date(booking.hold_expires_at) > now;
+  return (
+    (booking.status === "held" || booking.status === "pending_payment") &&
+    !!booking.hold_expires_at &&
+    new Date(booking.hold_expires_at) > now
+  );
 }

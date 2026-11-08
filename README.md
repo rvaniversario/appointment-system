@@ -47,9 +47,14 @@ pages live under `/f/<firm-slug>`, and a firm with one attorney goes straight to
 Run the tests:
 
 ```bash
-npm test          # unit tests (slot generation, Manila time)
-npm run db:test   # database tests: firm isolation, conflict checks
+npm test          # unit tests (slot generation, Manila time, webhook signatures)
+npm run db:test   # database tests: firm isolation, conflict checks, payment secrets
+npm run test:e2e  # browser tests: booking, payments (against a mock PayMongo), staff sign-in
 ```
+
+`npm run test:e2e` resets the **local** database, builds the app and serves it on port 3100,
+with a mock PayMongo server on 4010. It needs Docker, `npx supabase start`, and
+`npx playwright install chromium` once. Pass a suite name to run one: `npm run test:e2e -- payments`.
 
 ### Environment variables
 
@@ -59,6 +64,8 @@ npm run db:test   # database tests: firm isolation, conflict checks
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser + server | Publishable (anon) key; RLS applies |
 | `NEXT_PUBLIC_SITE_URL` | browser + server | Canonical production URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only** | Bypasses RLS. Admin tasks only |
+| `PAYMONGO_SECRET_KEY` | **server only** | The platform's parent PayMongo account (`sk_test_…` / `sk_live_…`) |
+| `CRON_SECRET` | **server only** | Bearer token for `/api/cron/reconcile-payments` (32+ characters) |
 
 `lib/env.ts` validates these at startup. Server secrets live in `lib/env.server.ts`, which
 is guarded by `server-only` so they can never be bundled into client code.
@@ -99,6 +106,29 @@ is guarded by `server-only` so they can never be bundled into client code.
 - **DB types:** `lib/supabase/database.types.ts`. Regenerate it with `npm run db:types`
   after linking a project (`npx supabase link`).
 
+### Online payments (PayMongo Linked Accounts)
+
+Each firm's own PayMongo account is linked under the platform's parent account. Checkouts,
+refunds and webhooks use the parent secret key plus the firm's `Account-ID`, so payments settle
+to the firm, which stays merchant of record. The platform takes no share of them.
+
+Connect a firm, until firms can do it themselves:
+
+```bash
+npm run paymongo:link -- --firm santos-law --invite atty@santoslaw.ph   # send a linking invitation
+npm run paymongo:link -- --firm santos-law --check                      # after they accept it
+npm run paymongo:link -- --firm santos-law --account org_…              # already linked in PayMongo
+```
+
+Activating registers a webhook on the firm's account at
+`<NEXT_PUBLIC_SITE_URL>/api/webhooks/paymongo/<firm id>`, so the site must be reachable over
+HTTPS (use `--webhook-base` with a tunnel in development). Until a firm is connected, its paid
+consultation types can't be booked online; free ones still can.
+
+Clients have 30 minutes to pay before their time is released. `/api/cron/reconcile-payments`
+runs daily (`vercel.json`) to settle payments whose webhook never arrived, because PayMongo
+doesn't resend them. Partners and admins refund from **Staff → Billing**.
+
 ## Deploying (Vercel + Supabase)
 
 1. Create **two Supabase projects**, staging and production. Enable PITR backups on production.
@@ -116,7 +146,8 @@ is guarded by `server-only` so they can never be bundled into client code.
    - **Passwords**: minimum length 12, with lowercase, uppercase and digits required.
    - **SMTP**: Resend. The default Supabase mailer is rate-limited and not for production.
 4. In Vercel, import the repo and set the env vars above for Preview (staging project) and
-   Production (production project).
+   Production (production project). Use a PayMongo test key on Preview and the live key only on
+   Production.
 5. Bootstrap a firm's first admin against production with `npm run staff:create`, using the
    production env values and `--firm <slug> --firm-name "<name>"`. A fresh production database
    starts with no firms.
@@ -129,7 +160,7 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
 - [x] Phase 1: Supabase foundation: schema + RLS, storage buckets, real client/staff auth with staff MFA
 - [x] Phase 2: Multi-tenant foundation: firms, memberships, firm-scoped RLS and storage, cross-firm tests in CI
 - [x] Phase 3: Firm booking pages + booking wizard on real data (slots, holds, server-side conflict check, uploads)
-- [ ] Phase 4: Per-firm PayMongo checkout + webhook for consultation fees
+- [x] Phase 4: Per-firm PayMongo checkout + webhook for consultation fees
 - [ ] Phase 5: Portal + staff dashboard on real data, staff invites, firm settings
 - [ ] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm
 - [ ] Phase 7: Firm self-service signup + platform admin
