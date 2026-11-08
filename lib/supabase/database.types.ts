@@ -14,7 +14,8 @@ type Table<Row, Required extends keyof Row = never> = {
 type Ts = string;
 type Uuid = string;
 
-export type UserRole = "client" | "attorney" | "partner" | "admin";
+export type FirmRole = "attorney" | "partner" | "admin";
+export type FirmStatus = "pending" | "active" | "suspended";
 export type ConsultMode = "phone" | "video" | "in_person";
 export type AppointmentStatus = "held" | "pending_payment" | "confirmed" | "canceled" | "completed" | "no_show";
 export type ReviewStatus = "pending" | "approved" | "declined";
@@ -30,7 +31,6 @@ export interface Database {
       profiles: Table<
         {
           id: Uuid;
-          role: UserRole;
           email: string;
           first_name: string;
           middle_name: string;
@@ -45,13 +45,33 @@ export interface Database {
         },
         "id" | "email"
       >;
+      firms: Table<
+        {
+          id: Uuid;
+          slug: string;
+          name: string;
+          status: FirmStatus;
+          logo_path: string | null;
+          contact_email: string | null;
+          contact_phone: string | null;
+          created_at: Ts;
+          updated_at: Ts;
+        },
+        "slug" | "name"
+      >;
+      firm_memberships: Table<
+        { profile_id: Uuid; firm_id: Uuid; role: FirmRole; created_at: Ts },
+        "profile_id" | "firm_id" | "role"
+      >;
+      platform_admins: Table<{ profile_id: Uuid; created_at: Ts }, "profile_id">;
       offices: Table<
-        { id: Uuid; name: string; address: string; is_remote: boolean; created_at: Ts },
-        "name"
+        { id: Uuid; firm_id: Uuid; name: string; address: string; is_remote: boolean; created_at: Ts },
+        "firm_id" | "name"
       >;
       attorneys: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           profile_id: Uuid | null;
           slug: string;
           full_name: string;
@@ -67,11 +87,12 @@ export interface Database {
           created_at: Ts;
           updated_at: Ts;
         },
-        "slug" | "full_name"
+        "firm_id" | "slug" | "full_name"
       >;
       consult_types: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           slug: string;
           label: string;
           description: string;
@@ -82,7 +103,7 @@ export interface Database {
           sort_order: number;
           created_at: Ts;
         },
-        "slug" | "label" | "mode" | "duration_minutes"
+        "firm_id" | "slug" | "label" | "mode" | "duration_minutes"
       >;
       availability_rules: Table<
         { id: Uuid; attorney_id: Uuid; weekday: number; start_time: string; end_time: string },
@@ -95,6 +116,7 @@ export interface Database {
       appointments: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           attorney_id: Uuid;
           client_id: Uuid | null;
           consult_type_id: Uuid;
@@ -111,11 +133,12 @@ export interface Database {
           created_at: Ts;
           updated_at: Ts;
         },
-        "attorney_id" | "consult_type_id" | "starts_at" | "ends_at"
+        "firm_id" | "attorney_id" | "consult_type_id" | "starts_at" | "ends_at"
       >;
       intakes: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           appointment_id: Uuid;
           client_id: Uuid | null;
           first_name: string;
@@ -130,6 +153,7 @@ export interface Database {
           sms_opt_in: boolean;
           created_at: Ts;
         },
+        | "firm_id"
         | "appointment_id"
         | "first_name"
         | "last_name"
@@ -140,23 +164,25 @@ export interface Database {
         | "privacy_consent_at"
       >;
       conflict_parties: Table<
-        { id: Uuid; name: string; matter: string; attorney_id: Uuid | null; created_at: Ts },
-        "name" | "matter"
+        { id: Uuid; firm_id: Uuid; name: string; matter: string; attorney_id: Uuid | null; created_at: Ts },
+        "firm_id" | "name" | "matter"
       >;
       conflict_hits: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           appointment_id: Uuid;
           conflict_party_id: Uuid;
           matched_name: string;
           similarity: number;
           created_at: Ts;
         },
-        "appointment_id" | "conflict_party_id" | "matched_name" | "similarity"
+        "firm_id" | "appointment_id" | "conflict_party_id" | "matched_name" | "similarity"
       >;
       documents: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           owner_id: Uuid;
           appointment_id: Uuid | null;
           storage_path: string;
@@ -166,11 +192,12 @@ export interface Database {
           uploaded_by: Uuid | null;
           created_at: Ts;
         },
-        "owner_id" | "storage_path" | "file_name" | "mime_type" | "size_bytes"
+        "firm_id" | "owner_id" | "storage_path" | "file_name" | "mime_type" | "size_bytes"
       >;
       agreements: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           appointment_id: Uuid;
           client_id: Uuid | null;
           version: string;
@@ -180,11 +207,12 @@ export interface Database {
           ip_address: string | null;
           user_agent: string | null;
         },
-        "appointment_id" | "version" | "body_sha256" | "signature_name"
+        "firm_id" | "appointment_id" | "version" | "body_sha256" | "signature_name"
       >;
       invoices: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           client_id: Uuid;
           appointment_id: Uuid | null;
           description: string;
@@ -196,11 +224,12 @@ export interface Database {
           created_at: Ts;
           updated_at: Ts;
         },
-        "client_id" | "description" | "amount_centavos"
+        "firm_id" | "client_id" | "description" | "amount_centavos"
       >;
       payments: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           client_id: Uuid | null;
           appointment_id: Uuid | null;
           invoice_id: Uuid | null;
@@ -213,15 +242,15 @@ export interface Database {
           created_at: Ts;
           updated_at: Ts;
         },
-        "amount_centavos"
+        "firm_id" | "amount_centavos"
       >;
       webhook_events: Table<
-        { id: string; provider: string; type: string; payload: Json; received_at: Ts },
+        { id: string; provider: string; account_id: string; type: string; payload: Json; received_at: Ts },
         "id" | "provider" | "type" | "payload"
       >;
       message_threads: Table<
-        { id: Uuid; client_id: Uuid; attorney_id: Uuid; created_at: Ts },
-        "client_id" | "attorney_id"
+        { id: Uuid; firm_id: Uuid; client_id: Uuid; attorney_id: Uuid; created_at: Ts },
+        "firm_id" | "client_id" | "attorney_id"
       >;
       messages: Table<
         { id: Uuid; thread_id: Uuid; sender_id: Uuid; body: string; read_at: Ts | null; created_at: Ts },
@@ -230,6 +259,7 @@ export interface Database {
       notification_log: Table<
         {
           id: Uuid;
+          firm_id: Uuid;
           channel: NotificationChannel;
           template: string;
           recipient: string;
@@ -241,11 +271,12 @@ export interface Database {
           created_at: Ts;
           sent_at: Ts | null;
         },
-        "channel" | "template" | "recipient"
+        "firm_id" | "channel" | "template" | "recipient"
       >;
       audit_log: Table<
         {
           id: number;
+          firm_id: Uuid | null;
           actor_id: Uuid | null;
           action: string;
           entity: string;
@@ -258,13 +289,14 @@ export interface Database {
     };
     Views: { [_ in never]: never };
     Functions: {
-      current_user_role: { Args: Record<string, never>; Returns: UserRole };
+      current_firm_id: { Args: Record<string, never>; Returns: Uuid };
       is_staff: { Args: Record<string, never>; Returns: boolean };
       is_manager: { Args: Record<string, never>; Returns: boolean };
       current_attorney_id: { Args: Record<string, never>; Returns: Uuid };
     };
     Enums: {
-      user_role: UserRole;
+      firm_role: FirmRole;
+      firm_status: FirmStatus;
       consult_mode: ConsultMode;
       appointment_status: AppointmentStatus;
       review_status: ReviewStatus;

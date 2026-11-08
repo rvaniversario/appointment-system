@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { hasVerifiedTotp, isStaffRole, requireStaff } from "@/lib/auth/session";
+import { hasVerifiedTotp, isFirmMember, requireStaff } from "@/lib/auth/session";
 import type { ActionResult } from "@/app/portal/actions";
 
 const GENERIC_LOGIN_ERROR = "Incorrect email or password.";
@@ -26,8 +26,7 @@ export async function staffSignIn(email: string, password: string): Promise<Acti
     return { ok: false, error: GENERIC_LOGIN_ERROR };
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
-  if (!profile || !isStaffRole(profile.role)) {
+  if (!(await isFirmMember(data.user.id))) {
     await supabase.auth.signOut();
     return { ok: false, error: GENERIC_LOGIN_ERROR };
   }
@@ -86,8 +85,7 @@ export async function startTotpEnrollment(): Promise<EnrollmentResult> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/staff/login");
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", userData.user.id).single();
-  if (!profile || !isStaffRole(profile.role)) redirect("/staff/login");
+  if (!(await isFirmMember(userData.user.id))) redirect("/staff/login");
 
   const { data: factors } = await supabase.auth.mfa.listFactors();
   if (factors?.totp.some((f) => f.status === "verified")) redirect("/staff/verify");

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",
+    "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --linked > lib/supabase/database.types.ts",
     "staff:create": "node --env-file=.env.local scripts/create-staff-user.mjs"
   },
