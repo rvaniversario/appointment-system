@@ -5,7 +5,7 @@ import { DOCUMENT_ACCEPT, DOCUMENTS_BUCKET } from "@/lib/documents/rules";
 import { confirmDocumentUpload, createDocumentUpload, getDocumentDownloadUrl } from "@/lib/portal/actions";
 import type { PortalDocument, PortalFirm } from "@/lib/portal/types";
 import { createClient } from "@/lib/supabase/client";
-import { card, colors, errorTextStyle, portalHeading, secondaryButton } from "@/lib/booking/ui";
+import { card, colors, errorTextStyle, pageHeading, secondaryButton } from "@/lib/booking/ui";
 
 export function DocumentsView({ documents, firms }: { documents: PortalDocument[]; firms: PortalFirm[] }) {
   const [firmId, setFirmId] = useState(firms[0]?.id ?? "");
@@ -46,7 +46,7 @@ export function DocumentsView({ documents, firms }: { documents: PortalDocument[
 
   return (
     <div>
-      <h2 style={portalHeading}>Documents</h2>
+      <h2 style={pageHeading}>Documents</h2>
 
       {firms.length > 0 ? (
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>

@@ -321,6 +321,11 @@ export interface Database {
       run_conflict_check: { Args: { p_appointment: Uuid }; Returns: number };
       firm_accepts_payments: { Args: { p_firm: Uuid }; Returns: boolean };
       mark_thread_read: { Args: { p_thread: Uuid }; Returns: undefined };
+      replace_weekly_hours: { Args: { p_attorney: Uuid; p_hours: Json }; Returns: undefined };
+      search_conflict_parties: {
+        Args: { p_query: string };
+        Returns: { id: Uuid; name: string; matter: string; attorney_id: Uuid | null; similarity: number }[];
+      };
     };
     Enums: {
       firm_role: FirmRole;

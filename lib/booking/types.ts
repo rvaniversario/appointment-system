@@ -8,24 +8,6 @@ export type WizardStepId =
   | "video"
   | "confirmation";
 
-export interface Attorney {
-  id: string;
-  name: string;
-  practiceAreas: string[];
-  languages: string[];
-  location: string;
-  barAdmission: string;
-  bio: string;
-  /** avail[dayIndex] = list of TIME_SLOTS indexes open that day */
-  avail: number[][];
-}
-
-export interface ConflictEntry {
-  name: string;
-  matter: string;
-  attorneyId: string;
-}
-
 export type Urgency = "standard" | "urgent";
 
 export interface IntakeState {
@@ -61,29 +43,6 @@ export interface UploadedFile {
 export interface AgreementState {
   agreed: boolean;
   signature: string;
-}
-
-export type AdminRole = "attorney" | "partner";
-export type AdminTab = "calendar" | "queue" | "conflicts" | "analytics" | "billing";
-
-export interface QueueLead {
-  id: number;
-  name: string;
-  caseType: string;
-  urgency: Urgency;
-  attorneyId: string;
-  conflict: boolean;
-  status: "pending" | "approved";
-  reassignTo: string;
-}
-
-export interface AdminState {
-  loginEmail: string;
-  loginPassword: string;
-  code: string;
-  role: AdminRole;
-  conflictSearch: string;
-  queue: QueueLead[];
 }
 
 export type SettingsTab = "profile" | "billing";
@@ -130,10 +89,4 @@ export interface WizardState {
   pending: boolean;
   cameraOk: boolean;
   micOk: boolean;
-}
-
-export interface DayInfo {
-  dow: string;
-  day: number;
-  label: string;
 }
