@@ -67,7 +67,7 @@ The riskiest phase. Nothing else ships on the old security model.
 - Run them locally with `npm run db:test`, and in GitHub Actions on every pull request. CI moves
   up from the hardening phase for this reason.
 
-## Phase 3: Firm booking pages and wizard on real data
+## Phase 3: Firm booking pages and wizard on real data (done)
 - Move `/attorneys` and `/book/*` under `/f/[firmSlug]`, and update the matcher in `proxy.ts`.
 - Solo firms skip the directory and go straight to the attorney's page.
 - Replace the hard-coded "Harlow & Reyes" text (`app/layout.tsx`, `app/(marketing)/page.tsx`,
@@ -77,6 +77,13 @@ The riskiest phase. Nothing else ships on the old security model.
   conflict check, uploads, versioned agreements. Agreement text is per firm.
 - All booking goes through one server-side check, `firm_can_accept_bookings()`, so Phase 8 can
   switch it on without touching the wizard.
+- Carried forward from this phase:
+  - Paid consultations stop at the payment step with a notice until Phase 4.
+  - Guest bookings link to an account by the email typed, without proving the visitor owns it.
+    Phase 6 adds an emailed code before a guest booking is confirmed.
+  - Anyone can place 15-minute holds; Phase 9's rate limits and Turnstile cover abuse.
+  - Attorney photos still show a placeholder until firm settings (Phase 5) can upload them.
+  - The product name in `lib/brand.ts` is a placeholder.
 
 ## Phase 4: Consultation fee payments (per firm)
 - **Start with a short spike on connecting firm accounts:**

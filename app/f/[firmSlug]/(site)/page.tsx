@@ -1,19 +1,40 @@
 import Link from "next/link";
-import { filterAttorneys } from "@/lib/booking/data";
+import { notFound, redirect } from "next/navigation";
 import { DirectoryFilters } from "@/components/booking/directory-filters";
+import { getPublicFirm, listFirmAttorneys } from "@/lib/booking/queries";
 
 function firstParam(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? "";
   return value ?? "";
 }
 
-export default async function AttorneysPage(props: PageProps<"/attorneys">) {
-  const searchParams = await props.searchParams;
+const unique = (values: string[]) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+/** A firm's attorney directory. A solo practitioner's firm goes straight to their profile. */
+export default async function FirmDirectoryPage(props: PageProps<"/f/[firmSlug]">) {
+  const [{ firmSlug }, searchParams] = await Promise.all([props.params, props.searchParams]);
+  const firm = await getPublicFirm(firmSlug);
+  if (!firm) notFound();
+
+  const all = await listFirmAttorneys(firm.id);
+  if (all.length === 1) redirect(`/f/${firm.slug}/attorneys/${all[0].slug}`);
+
+  const basePath = `/f/${firm.slug}`;
   const practiceArea = firstParam(searchParams.practiceArea);
   const language = firstParam(searchParams.language);
   const location = firstParam(searchParams.location);
+  const options = {
+    practiceAreas: unique(all.flatMap((a) => a.practiceAreas)),
+    languages: unique(all.flatMap((a) => a.languages)),
+    locations: unique(all.map((a) => a.location)),
+  };
 
-  const attorneys = filterAttorneys({ practiceArea, language, location });
+  const attorneys = all.filter(
+    (a) =>
+      (!practiceArea || a.practiceAreas.includes(practiceArea)) &&
+      (!language || a.languages.includes(language)) &&
+      (!location || a.location === location),
+  );
 
   return (
     <div style={{ maxWidth: 1120, margin: "0 auto", padding: "40px 32px 80px" }}>
@@ -28,7 +49,7 @@ export default async function AttorneysPage(props: PageProps<"/attorneys">) {
             lineHeight: 1.2,
           }}
         >
-          Find the right attorney for your situation
+          Find the right attorney at {firm.name}
         </h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, color: "oklch(0.45 0.01 258)", margin: 0 }}>
           Tell us a little about what&apos;s going on. Every conversation is confidential, and
@@ -36,7 +57,13 @@ export default async function AttorneysPage(props: PageProps<"/attorneys">) {
         </p>
       </div>
 
-      <DirectoryFilters practiceArea={practiceArea} language={language} location={location} />
+      <DirectoryFilters
+        basePath={basePath}
+        options={options}
+        practiceArea={practiceArea}
+        language={language}
+        location={location}
+      />
 
       <div style={{ fontSize: 13, color: "oklch(0.55 0.01 258)", marginBottom: 20 }}>
         {attorneys.length} {attorneys.length === 1 ? "attorney matches" : "attorneys match"} your
@@ -127,12 +154,12 @@ export default async function AttorneysPage(props: PageProps<"/attorneys">) {
                 ))}
               </div>
               <div style={{ fontSize: 13, color: "oklch(0.5 0.01 258)" }}>
-                Speaks {a.languages.join(", ")}
+                {a.languages.length > 0 && `Speaks ${a.languages.join(", ")}`}
               </div>
               <div style={{ flex: 1 }} />
               <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                 <Link
-                  href={`/attorneys/${a.id}`}
+                  href={`${basePath}/attorneys/${a.slug}`}
                   style={{
                     flex: 1,
                     padding: "9px 0",
@@ -150,7 +177,7 @@ export default async function AttorneysPage(props: PageProps<"/attorneys">) {
                   View profile
                 </Link>
                 <Link
-                  href={`/book/${a.id}/time`}
+                  href={`${basePath}/book/${a.slug}/time`}
                   style={{
                     flex: 1,
                     padding: "9px 0",
@@ -179,7 +206,7 @@ export default async function AttorneysPage(props: PageProps<"/attorneys">) {
             No attorneys match those filters right now.
           </div>
           <Link
-            href="/attorneys"
+            href={basePath}
             style={{
               display: "inline-block",
               padding: "9px 16px",

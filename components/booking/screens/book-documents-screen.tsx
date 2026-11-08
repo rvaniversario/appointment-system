@@ -1,20 +1,23 @@
 "use client";
 
-import { primaryButton } from "@/lib/booking/ui";
+import { useRef } from "react";
+import type { UploadedFile } from "@/lib/booking/types";
+import { errorTextStyle, primaryButtonDisabled } from "@/lib/booking/ui";
 
 interface BookDocumentsScreenProps {
-  documents: string[];
-  onAdd: () => void;
-  onRemove: (idx: number) => void;
+  documents: UploadedFile[];
+  notice: string | null;
+  pending: boolean;
+  onUpload: (files: FileList) => void;
+  onRemove: (id: string) => void;
   onContinue: () => void;
 }
 
-export function BookDocumentsScreen({
-  documents,
-  onAdd,
-  onRemove,
-  onContinue,
-}: BookDocumentsScreenProps) {
+const ACCEPT = ".pdf,.docx,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png";
+
+export function BookDocumentsScreen({ documents, notice, pending, onUpload, onRemove, onContinue }: BookDocumentsScreenProps) {
+  const input = useRef<HTMLInputElement>(null);
+
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "36px 32px 80px" }}>
       <h1
@@ -32,30 +35,52 @@ export function BookDocumentsScreen({
         Optional — you can also bring documents to your consultation instead.
       </p>
 
-      <div
-        onClick={onAdd}
+      <input
+        ref={input}
+        type="file"
+        multiple
+        accept={ACCEPT}
+        hidden
+        onChange={(e) => {
+          if (e.target.files?.length) onUpload(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => input.current?.click()}
         style={{
+          display: "block",
+          width: "100%",
           border: "2px dashed oklch(0.8 0.005 90)",
           borderRadius: 12,
           padding: 36,
           textAlign: "center",
-          cursor: "pointer",
+          cursor: pending ? "wait" : "pointer",
           marginBottom: 20,
           background: "#fff",
+          font: "inherit",
         }}
       >
         <div style={{ fontSize: 15, fontWeight: 600, color: "oklch(0.28 0.05 258)", marginBottom: 4 }}>
-          Click to add a document
+          {pending ? "Uploading…" : "Click to add documents"}
         </div>
         <div style={{ fontSize: 13, color: "oklch(0.55 0.01 258)" }}>
-          PDF, DOCX, or image — encrypted on upload
+          PDF, Word (.docx), JPG or PNG, up to 10 MB each. Only this firm can see them.
         </div>
-      </div>
+      </button>
+
+      {notice && (
+        <div role="alert" style={{ ...errorTextStyle, fontSize: 14, marginBottom: 16 }}>
+          {notice}
+        </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
-        {documents.map((name, idx) => (
+        {documents.map((doc) => (
           <div
-            key={`${name}-${idx}`}
+            key={doc.id}
             style={{
               display: "flex",
               alignItems: "center",
@@ -66,9 +91,9 @@ export function BookDocumentsScreen({
               padding: "10px 14px",
             }}
           >
-            <span style={{ fontSize: 14, color: "oklch(0.32 0.01 258)" }}>{name}</span>
+            <span style={{ fontSize: 14, color: "oklch(0.32 0.01 258)" }}>{doc.name}</span>
             <button
-              onClick={() => onRemove(idx)}
+              onClick={() => onRemove(doc.id)}
               style={{
                 border: "none",
                 background: "none",
@@ -84,7 +109,7 @@ export function BookDocumentsScreen({
         ))}
       </div>
 
-      <button onClick={onContinue} style={{ ...primaryButton, width: "100%" }}>
+      <button disabled={pending} onClick={onContinue} style={primaryButtonDisabled(pending)}>
         Continue →
       </button>
     </div>

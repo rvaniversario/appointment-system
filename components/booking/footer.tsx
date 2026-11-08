@@ -1,12 +1,16 @@
 "use client";
 
+import { PLATFORM } from "@/lib/brand";
+
 interface FooterProps {
   /** Hides the staff sign-in link. */
   signedIn: boolean;
   onOpenAdmin: () => void;
+  /** Set on a firm's own pages. */
+  firmName?: string;
 }
 
-export function Footer({ signedIn, onOpenAdmin }: FooterProps) {
+export function Footer({ signedIn, onOpenAdmin, firmName }: FooterProps) {
   return (
     <footer
       style={{
@@ -18,8 +22,9 @@ export function Footer({ signedIn, onOpenAdmin }: FooterProps) {
         position: "relative",
       }}
     >
-      Harlow &amp; Reyes Attorneys at Law — this consultation booking does not establish an
-      attorney-client relationship until an engagement letter is signed.
+      {firmName
+        ? `${firmName} — this consultation booking does not establish an attorney-client relationship until an engagement letter is signed.`
+        : `${PLATFORM.name} — online consultation booking for Philippine law firms.`}
       {!signedIn && (
         <button
           onClick={onOpenAdmin}

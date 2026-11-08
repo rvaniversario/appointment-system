@@ -4,16 +4,17 @@ import { BookIntakeScreen } from "@/components/booking/screens/book-intake-scree
 import { useWizard } from "@/components/booking/wizard/wizard-context";
 
 export default function IntakeStepPage() {
-  const { attorney, state, onIntakeChange, backToDirectoryFromConflict, submitIntake } = useWizard();
+  const { firm, caseTypes, state, onIntakeChange, submitIntake } = useWizard();
 
   return (
     <BookIntakeScreen
-      attorneyName={attorney.name}
+      firmName={firm.name}
+      caseTypes={caseTypes}
       intake={state.intake}
       errors={state.errors}
-      conflictFlagged={state.conflictFlagged}
+      notice={state.notice}
+      pending={state.pending}
       onIntakeChange={onIntakeChange}
-      onBackToDirectoryFromConflict={backToDirectoryFromConflict}
       onSubmit={submitIntake}
     />
   );

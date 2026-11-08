@@ -1,28 +1,57 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import {
+  confirmFreeBooking,
+  confirmUpload,
+  createUploadUrl,
+  holdSlot,
+  loadSlots,
+  removeUpload,
+  signAgreement,
+  submitIntake as submitIntakeAction,
+} from "@/lib/booking/actions";
 import { createInitialWizardState } from "@/lib/booking/initial-state";
-import type { Attorney, IntakeState, PaymentState, WizardState } from "@/lib/booking/types";
+import type { ConsultTypeOption, PublicAttorney, PublicFirm } from "@/lib/booking/public-types";
+import type { SlotPageData } from "@/lib/booking/queries";
+import type { DaySlots } from "@/lib/booking/slots";
+import type { ErrorKey, IntakeState, WizardState } from "@/lib/booking/types";
+
+export interface SlotPage {
+  fromDate: string | null;
+  days: DaySlots[];
+  canGoBack: boolean;
+  canGoForward: boolean;
+  loading: boolean;
+}
 
 interface WizardContextValue {
-  attorney: Attorney;
+  firm: PublicFirm;
+  attorney: PublicAttorney;
+  consultTypes: ConsultTypeOption[];
+  agreementParagraphs: string[];
+  /** Intake case types: the attorney's practice areas, plus "Other". */
+  caseTypes: string[];
   state: WizardState;
+  slots: SlotPage;
+  selectedConsultType: ConsultTypeOption | undefined;
+  basePath: string;
   setConsultType: (id: string) => void;
-  setDate: (i: number) => void;
-  setTime: (t: string) => void;
+  showWeek: (direction: "back" | "forward") => void;
+  setDate: (date: string) => void;
+  setTime: (startsAt: string, label: string) => void;
   goToIntake: () => void;
   onIntakeChange: (patch: Partial<IntakeState>) => void;
   submitIntake: () => void;
-  backToDirectoryFromConflict: () => void;
-  addDemoDocument: () => void;
-  removeDocument: (idx: number) => void;
+  uploadFiles: (files: FileList) => void;
+  removeDocument: (id: string) => void;
   goToAgreement: () => void;
   onAgreementToggle: (agreed: boolean) => void;
   onAgreementSignature: (signature: string) => void;
   submitAgreement: () => void;
-  onPaymentChange: (patch: Partial<PaymentState>) => void;
-  submitPayment: () => void;
+  confirmBooking: () => void;
   toggleCameraCheck: () => void;
   toggleMicCheck: () => void;
   finishVideoCheck: () => void;
@@ -31,107 +60,211 @@ interface WizardContextValue {
 
 const WizardContext = createContext<WizardContextValue | null>(null);
 
+const BUCKET = "client-documents";
+const EMPTY_SLOTS: SlotPage = { fromDate: null, days: [], canGoBack: false, canGoForward: false, loading: false };
+
 export function BookingWizardProvider({
+  firm,
   attorney,
+  consultTypes,
+  agreementParagraphs,
+  prefill,
+  initialSlots,
   children,
 }: {
-  attorney: Attorney;
+  firm: PublicFirm;
+  attorney: PublicAttorney;
+  consultTypes: ConsultTypeOption[];
+  agreementParagraphs: string[];
+  prefill: { firstName?: string; lastName?: string; email?: string; phone?: string };
+  /** The first week of open times, when the firm has a single consultation type. */
+  initialSlots: SlotPageData | null;
   children: ReactNode;
 }) {
   const router = useRouter();
-  const [state, setState] = useState<WizardState>(createInitialWizardState);
+  const [state, setState] = useState<WizardState>(() => {
+    const initial = createInitialWizardState(prefill);
+    if (consultTypes.length === 1) initial.booking.consultTypeId = consultTypes[0].id;
+    return initial;
+  });
+  const [slots, setSlots] = useState<SlotPage>(() => (initialSlots ? { ...initialSlots, loading: false } : EMPTY_SLOTS));
+  const basePath = `/f/${firm.slug}`;
+  const bookPath = `${basePath}/book/${attorney.slug}`;
+  const caseTypes = [...attorney.practiceAreas, "Other"];
+  const selectedConsultType = consultTypes.find((c) => c.id === state.booking.consultTypeId);
 
-  const goToStep = (step: string) => router.push(`/book/${attorney.id}/${step}`);
+  const goToStep = (step: string) => router.push(`${bookPath}/${step}`);
+  const patch = (p: Partial<WizardState>) => setState((s) => ({ ...s, ...p }));
 
-  const setConsultType = (id: string) =>
-    setState((s) => ({ ...s, booking: { ...s.booking, consultType: id } }));
-  const setDate = (i: number) =>
-    setState((s) => ({ ...s, booking: { ...s.booking, dateIndex: i, time: null } }));
-  const setTime = (t: string) => setState((s) => ({ ...s, booking: { ...s.booking, time: t } }));
-  const goToIntake = () => goToStep("intake");
+  /** The hold has lapsed on the server, so start again from the time step. */
+  const restartFromTime = (message: string) => {
+    setState((s) => ({ ...s, held: false, notice: message, pending: false, booking: { ...s.booking, startsAt: null, timeLabel: null } }));
+    goToStep("time");
+  };
 
-  const onIntakeChange = (patch: Partial<IntakeState>) =>
-    setState((s) => ({ ...s, intake: { ...s.intake, ...patch } }));
+  const fetchSlots = useCallback(
+    async (consultTypeId: string, fromDate?: string) => {
+      setSlots((s) => ({ ...s, loading: true }));
+      const result = await loadSlots({ firmSlug: firm.slug, attorneySlug: attorney.slug, consultTypeId, fromDate });
+      if (!result.ok) {
+        setSlots(EMPTY_SLOTS);
+        patch({ notice: result.error });
+        return;
+      }
+      setSlots({ fromDate: result.fromDate, days: result.days, canGoBack: result.canGoBack, canGoForward: result.canGoForward, loading: false });
+    },
+    [firm.slug, attorney.slug],
+  );
 
-  const submitIntake = () => {
+
+  const setConsultType = (id: string) => {
+    setState((s) => ({ ...s, notice: null, held: false, booking: { consultTypeId: id, date: null, startsAt: null, timeLabel: null } }));
+    void fetchSlots(id, slots.fromDate ?? undefined);
+  };
+
+  const showWeek = (direction: "back" | "forward") => {
+    if (!state.booking.consultTypeId || !slots.fromDate) return;
+    const [y, m, d] = slots.fromDate.split("-").map(Number);
+    const next = new Date(Date.UTC(y, m - 1, d + (direction === "forward" ? 7 : -7))).toISOString().slice(0, 10);
+    void fetchSlots(state.booking.consultTypeId, next);
+  };
+
+  const setDate = (date: string) =>
+    setState((s) => ({ ...s, held: false, booking: { ...s.booking, date, startsAt: null, timeLabel: null } }));
+  const setTime = (startsAt: string, timeLabel: string) =>
+    setState((s) => ({ ...s, held: false, booking: { ...s.booking, startsAt, timeLabel } }));
+
+  const goToIntake = async () => {
+    const { consultTypeId, startsAt } = state.booking;
+    if (!consultTypeId || !startsAt) return;
+    if (state.held) return goToStep("intake");
+    patch({ pending: true, notice: null });
+    const result = await holdSlot({ firmSlug: firm.slug, attorneySlug: attorney.slug, consultTypeId, startsAt });
+    if (!result.ok) {
+      setState((s) => ({ ...s, pending: false, notice: result.error, booking: { ...s.booking, startsAt: null, timeLabel: null } }));
+      if (result.code === "taken") void fetchSlots(consultTypeId, slots.fromDate ?? undefined);
+      return;
+    }
+    patch({ pending: false, held: true });
+    goToStep("intake");
+  };
+
+  const onIntakeChange = (p: Partial<IntakeState>) => setState((s) => ({ ...s, intake: { ...s.intake, ...p } }));
+
+  const submitIntake = async () => {
     const i = state.intake;
     const errors: WizardState["errors"] = {};
     if (!i.firstName.trim()) errors.firstName = true;
     if (!i.lastName.trim()) errors.lastName = true;
     if (!i.email.trim()) errors.email = true;
     if (!i.phone.trim()) errors.phone = true;
+    if (!i.caseType) errors.caseType = true;
     if (!i.details.trim()) errors.details = true;
     if (!i.ack) errors.ack = true;
-    if (Object.keys(errors).length) {
-      setState((s) => ({ ...s, errors }));
-      return;
+    if (!i.privacyConsent) errors.privacyConsent = true;
+    if (Object.keys(errors).length) return patch({ errors, notice: null });
+
+    patch({ pending: true, errors: {}, notice: null });
+    const result = await submitIntakeAction({ firmSlug: firm.slug, intake: i });
+    if (!result.ok) {
+      if (result.code === "expired") return restartFromTime(result.error);
+      const fieldErrors = Object.fromEntries((("fields" in result && result.fields) || []).map((f) => [f as ErrorKey, true]));
+      return patch({ pending: false, errors: fieldErrors, notice: result.error });
     }
-    const flagged = i.opposingParty.trim().toLowerCase().includes("smith");
-    setState((s) => ({ ...s, errors: {}, conflictFlagged: flagged }));
-    if (!flagged) goToStep("documents");
+    patch({ pending: false, intakeSaved: true });
+    goToStep("documents");
   };
 
-  const backToDirectoryFromConflict = () => router.push("/attorneys");
+  const uploadFiles = async (files: FileList) => {
+    patch({ pending: true, notice: null });
+    const supabase = createClient();
+    for (const file of Array.from(files)) {
+      const url = await createUploadUrl({ firmSlug: firm.slug, fileName: file.name, size: file.size, mimeType: file.type });
+      if (!url.ok) {
+        if (url.code === "expired") return restartFromTime(url.error);
+        patch({ notice: `${file.name}: ${url.error}` });
+        continue;
+      }
+      const { error } = await supabase.storage.from(BUCKET).uploadToSignedUrl(url.path, url.token, file, { contentType: file.type });
+      if (error) {
+        patch({ notice: `${file.name} couldn't be uploaded. Please try again.` });
+        continue;
+      }
+      const saved = await confirmUpload({ firmSlug: firm.slug, path: url.path, fileName: file.name });
+      if (!saved.ok) {
+        patch({ notice: `${file.name}: ${saved.error}` });
+        continue;
+      }
+      setState((s) => ({ ...s, documents: [...s.documents, saved.document] }));
+    }
+    patch({ pending: false });
+  };
 
-  const addDemoDocument = () =>
-    setState((s) => ({ ...s, documents: [...s.documents, `Document ${s.documents.length + 1}.pdf`] }));
-  const removeDocument = (idx: number) =>
-    setState((s) => ({ ...s, documents: s.documents.filter((_, i) => i !== idx) }));
+  const removeDocument = async (id: string) => {
+    const result = await removeUpload({ firmSlug: firm.slug, documentId: id });
+    if (!result.ok) return patch({ notice: result.error });
+    setState((s) => ({ ...s, documents: s.documents.filter((d) => d.id !== id) }));
+  };
+
   const goToAgreement = () => goToStep("agreement");
 
-  const onAgreementToggle = (agreed: boolean) =>
-    setState((s) => ({ ...s, agreement: { ...s.agreement, agreed } }));
-  const onAgreementSignature = (signature: string) =>
-    setState((s) => ({ ...s, agreement: { ...s.agreement, signature } }));
-  const submitAgreement = () => {
+  const onAgreementToggle = (agreed: boolean) => setState((s) => ({ ...s, agreement: { ...s.agreement, agreed } }));
+  const onAgreementSignature = (signature: string) => setState((s) => ({ ...s, agreement: { ...s.agreement, signature } }));
+
+  const submitAgreement = async () => {
     const a = state.agreement;
-    if (!a.agreed || !a.signature.trim()) {
-      setState((s) => ({ ...s, errors: { agreement: true } }));
-      return;
+    if (!a.agreed || !a.signature.trim()) return patch({ errors: { agreement: true } });
+    patch({ pending: true, errors: {}, notice: null });
+    const result = await signAgreement({ firmSlug: firm.slug, signatureName: a.signature });
+    if (!result.ok) {
+      if (result.code === "expired") return restartFromTime(result.error);
+      return patch({ pending: false, notice: result.error });
     }
-    setState((s) => ({ ...s, errors: {} }));
+    patch({ pending: false, agreementSigned: true });
     goToStep("payment");
   };
 
-  const onPaymentChange = (patch: Partial<PaymentState>) =>
-    setState((s) => ({ ...s, payment: { ...s.payment, ...patch } }));
-  const submitPayment = () => {
-    const isFree = state.booking.consultType === "free-phone";
-    if (!isFree) {
-      const p = state.payment;
-      if (!p.cardName.trim() || !p.cardNumber.trim() || !p.cardExpiry.trim() || !p.cardCvc.trim()) {
-        setState((s) => ({ ...s, errors: { payment: true } }));
-        return;
-      }
+  const confirmBooking = async () => {
+    patch({ pending: true, notice: null });
+    const result = await confirmFreeBooking({ firmSlug: firm.slug });
+    if (!result.ok) {
+      if (result.code === "expired") return restartFromTime(result.error);
+      return patch({ pending: false, notice: result.error });
     }
-    setState((s) => ({ ...s, errors: {} }));
-    goToStep(state.booking.consultType === "video-30" ? "video" : "confirmation");
+    patch({ pending: false });
+    goToStep(selectedConsultType?.mode === "video" ? "video" : "confirmation");
   };
 
   const toggleCameraCheck = () => setState((s) => ({ ...s, cameraOk: !s.cameraOk }));
   const toggleMicCheck = () => setState((s) => ({ ...s, micOk: !s.micOk }));
   const finishVideoCheck = () => goToStep("confirmation");
 
-  const restart = () => router.push("/attorneys");
+  const restart = () => router.push(basePath);
 
   const value: WizardContextValue = {
+    firm,
     attorney,
+    consultTypes,
+    agreementParagraphs,
+    caseTypes,
     state,
+    slots,
+    selectedConsultType,
+    basePath,
     setConsultType,
+    showWeek,
     setDate,
     setTime,
-    goToIntake,
+    goToIntake: () => void goToIntake(),
     onIntakeChange,
-    submitIntake,
-    backToDirectoryFromConflict,
-    addDemoDocument,
-    removeDocument,
+    submitIntake: () => void submitIntake(),
+    uploadFiles: (files) => void uploadFiles(files),
+    removeDocument: (id) => void removeDocument(id),
     goToAgreement,
     onAgreementToggle,
     onAgreementSignature,
-    submitAgreement,
-    onPaymentChange,
-    submitPayment,
+    submitAgreement: () => void submitAgreement(),
+    confirmBooking: () => void confirmBooking(),
     toggleCameraCheck,
     toggleMicCheck,
     finishVideoCheck,

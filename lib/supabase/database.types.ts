@@ -54,6 +54,7 @@ export interface Database {
           logo_path: string | null;
           contact_email: string | null;
           contact_phone: string | null;
+          agreement_text: string | null;
           created_at: Ts;
           updated_at: Ts;
         },
@@ -130,6 +131,7 @@ export interface Database {
           price_centavos: number;
           canceled_at: Ts | null;
           cancel_reason: string | null;
+          booking_token_hash: string | null;
           created_at: Ts;
           updated_at: Ts;
         },
@@ -293,6 +295,8 @@ export interface Database {
       is_staff: { Args: Record<string, never>; Returns: boolean };
       is_manager: { Args: Record<string, never>; Returns: boolean };
       current_attorney_id: { Args: Record<string, never>; Returns: Uuid };
+      firm_can_accept_bookings: { Args: { p_firm: Uuid }; Returns: boolean };
+      run_conflict_check: { Args: { p_appointment: Uuid }; Returns: number };
     };
     Enums: {
       firm_role: FirmRole;

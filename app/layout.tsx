@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Lora, Public_Sans } from "next/font/google";
 import "./globals.css";
+import { PLATFORM } from "@/lib/brand";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -15,9 +16,8 @@ const publicSans = Public_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Harlow & Reyes | Attorneys at Law",
-  description:
-    "Find the right attorney at Harlow & Reyes and book a confidential consultation online.",
+  title: { default: PLATFORM.name, template: `%s | ${PLATFORM.name}` },
+  description: "Online consultation booking for Philippine law firms.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

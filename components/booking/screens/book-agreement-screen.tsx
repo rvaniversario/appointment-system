@@ -1,10 +1,14 @@
 "use client";
 
 import type { AgreementState, ErrorState } from "@/lib/booking/types";
-import { primaryButton } from "@/lib/booking/ui";
+import { errorTextStyle, primaryButtonDisabled } from "@/lib/booking/ui";
 
 interface BookAgreementScreenProps {
   attorneyName: string;
+  /** The exact text being signed. */
+  paragraphs: string[];
+  notice: string | null;
+  pending: boolean;
   agreement: AgreementState;
   errors: ErrorState;
   onToggle: (agreed: boolean) => void;
@@ -14,6 +18,9 @@ interface BookAgreementScreenProps {
 
 export function BookAgreementScreen({
   attorneyName,
+  paragraphs,
+  notice,
+  pending,
   agreement,
   errors,
   onToggle,
@@ -51,19 +58,9 @@ export function BookAgreementScreen({
           marginBottom: 24,
         }}
       >
-        <p>
-          This Consultation Agreement confirms that you have scheduled a paid or complimentary
-          consultation with Harlow &amp; Reyes to discuss the matter described in your intake
-          form. This consultation is for the purpose of evaluating your legal situation and does
-          not, by itself, create an attorney-client relationship or establish representation.
-        </p>
-        <p>
-          Any information you share during the consultation will be treated as confidential in
-          accordance with applicable rules of professional conduct. If the firm agrees to
-          represent you following the consultation, a separate engagement letter outlining scope,
-          fees, and terms of representation will be provided for your signature.
-        </p>
-        <p>You may cancel or reschedule this consultation up to 24 hours in advance without charge.</p>
+        {paragraphs.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
       </div>
 
       <label
@@ -119,8 +116,14 @@ export function BookAgreementScreen({
         </div>
       )}
 
-      <button onClick={onSubmit} style={{ ...primaryButton, width: "100%", marginTop: 14 }}>
-        Continue to payment →
+      {notice && (
+        <div role="alert" style={{ ...errorTextStyle, fontSize: 14 }}>
+          {notice}
+        </div>
+      )}
+
+      <button disabled={pending} onClick={onSubmit} style={{ ...primaryButtonDisabled(pending), marginTop: 14 }}>
+        {pending ? "Signing…" : "Sign and continue →"}
       </button>
     </div>
   );

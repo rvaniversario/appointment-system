@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { PLATFORM, type Brand } from "@/lib/brand";
 
 export interface StepperItem {
   label: string;
@@ -29,6 +30,8 @@ interface HeaderProps {
   onToggleUserMenu: () => void;
   showBackLink: boolean;
   onOpenPortal: () => void;
+  /** Defaults to the platform's own name. */
+  brand?: Brand;
 }
 
 const menuItemStyle: CSSProperties = {
@@ -51,6 +54,7 @@ export function Header({
   onToggleUserMenu,
   showBackLink,
   onOpenPortal,
+  brand = PLATFORM,
 }: HeaderProps) {
   return (
     <header
@@ -107,7 +111,7 @@ export function Header({
                 lineHeight: 1.1,
               }}
             >
-              Harlow &amp; Reyes
+              {brand.name}
             </div>
             <div
               style={{
@@ -117,7 +121,7 @@ export function Header({
                 textTransform: "uppercase",
               }}
             >
-              Attorneys at Law
+              {brand.tagline}
             </div>
           </div>
         </div>

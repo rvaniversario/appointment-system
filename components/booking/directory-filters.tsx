@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LANGUAGES, LOCATIONS, PRACTICE_AREAS, getFirstAvailable } from "@/lib/booking/data";
 
-interface DirectoryFiltersProps {
+interface FilterValues {
   practiceArea: string;
   language: string;
   location: string;
+}
+
+interface DirectoryFiltersProps extends FilterValues {
+  /** The firm's directory, e.g. /f/santos-law. */
+  basePath: string;
+  options: { practiceAreas: string[]; languages: string[]; locations: string[] };
 }
 
 const selectStyle = {
@@ -18,22 +23,35 @@ const selectStyle = {
   background: "#fff",
 } as const;
 
-function buildHref(filters: DirectoryFiltersProps): string {
+function buildHref(basePath: string, filters: FilterValues): string {
   const params = new URLSearchParams();
   if (filters.practiceArea) params.set("practiceArea", filters.practiceArea);
   if (filters.language) params.set("language", filters.language);
   if (filters.location) params.set("location", filters.location);
   const qs = params.toString();
-  return qs ? `/attorneys?${qs}` : "/attorneys";
+  return qs ? `${basePath}?${qs}` : basePath;
 }
 
-export function DirectoryFilters({ practiceArea, language, location }: DirectoryFiltersProps) {
+export function DirectoryFilters({ basePath, options, practiceArea, language, location }: DirectoryFiltersProps) {
   const router = useRouter();
-  const firstAvailable = getFirstAvailable();
 
-  const updateFilter = (patch: Partial<DirectoryFiltersProps>) => {
-    router.push(buildHref({ practiceArea, language, location, ...patch }));
+  const updateFilter = (patch: Partial<FilterValues>) => {
+    router.push(buildHref(basePath, { practiceArea, language, location, ...patch }));
   };
+
+  const select = (labelText: string, value: string, anyLabel: string, values: string[], key: keyof FilterValues, minWidth: number) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>{labelText}</label>
+      <select value={value} onChange={(e) => updateFilter({ [key]: e.target.value })} style={selectStyle}>
+        <option value="">{anyLabel}</option>
+        {values.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <div
@@ -49,59 +67,11 @@ export function DirectoryFilters({ practiceArea, language, location }: Directory
         marginBottom: 12,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 170 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>
-          Practice area
-        </label>
-        <select
-          value={practiceArea}
-          onChange={(e) => updateFilter({ practiceArea: e.target.value })}
-          style={selectStyle}
-        >
-          <option value="">Any practice area</option>
-          {PRACTICE_AREAS.map((pa) => (
-            <option key={pa} value={pa}>
-              {pa}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 150 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>
-          Language
-        </label>
-        <select
-          value={language}
-          onChange={(e) => updateFilter({ language: e.target.value })}
-          style={selectStyle}
-        >
-          <option value="">Any language</option>
-          {LANGUAGES.map((lang) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 170 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "oklch(0.4 0.01 258)" }}>
-          Office
-        </label>
-        <select
-          value={location}
-          onChange={(e) => updateFilter({ location: e.target.value })}
-          style={selectStyle}
-        >
-          <option value="">Any location</option>
-          {LOCATIONS.map((loc) => (
-            <option key={loc} value={loc}>
-              {loc}
-            </option>
-          ))}
-        </select>
-      </div>
+      {select("Practice area", practiceArea, "Any practice area", options.practiceAreas, "practiceArea", 170)}
+      {select("Language", language, "Any language", options.languages, "language", 150)}
+      {options.locations.length > 1 && select("Office", location, "Any location", options.locations, "location", 170)}
       <Link
-        href="/attorneys"
+        href={basePath}
         style={{
           padding: "9px 14px",
           border: "1px solid oklch(0.85 0.005 90)",
@@ -117,7 +87,8 @@ export function DirectoryFilters({ practiceArea, language, location }: Directory
       </Link>
       <div style={{ flex: 1 }} />
       <Link
-        href={firstAvailable ? `/book/${firstAvailable.attorneyId}/time` : "/attorneys"}
+        href={`${basePath}/first-available`}
+        prefetch={false}
         style={{
           padding: "11px 18px",
           border: "none",

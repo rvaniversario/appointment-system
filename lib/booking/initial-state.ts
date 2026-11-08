@@ -1,4 +1,3 @@
-import { PRACTICE_AREAS } from "./data";
 import type { AdminState, PortalState, WizardState } from "./types";
 
 export function createInitialPortalState(): PortalState {
@@ -50,25 +49,30 @@ export function createInitialAdminState(): AdminState {
   };
 }
 
-export function createInitialWizardState(): WizardState {
+export function createInitialWizardState(prefill: { firstName?: string; lastName?: string; email?: string; phone?: string } = {}): WizardState {
   return {
-    booking: { consultType: "", dateIndex: null, time: null },
+    booking: { consultTypeId: "", date: null, startsAt: null, timeLabel: null },
+    held: false,
+    intakeSaved: false,
     intake: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      caseType: PRACTICE_AREAS[0],
+      firstName: prefill.firstName ?? "",
+      lastName: prefill.lastName ?? "",
+      email: prefill.email ?? "",
+      phone: prefill.phone ?? "",
+      caseType: "",
       urgency: "standard",
       details: "",
       opposingParty: "",
       ack: false,
+      privacyConsent: false,
+      smsOptIn: false,
     },
-    conflictFlagged: false,
     documents: [],
     agreement: { agreed: false, signature: "" },
-    payment: { cardName: "", cardNumber: "", cardExpiry: "", cardCvc: "" },
+    agreementSigned: false,
     errors: {},
+    notice: null,
+    pending: false,
     cameraOk: false,
     micOk: false,
   };

@@ -1,4 +1,8 @@
-import type { Attorney, ConflictEntry, ConsultType, DayInfo } from "./types";
+/**
+ * Sample data for the client portal and staff dashboard screens, which move to real data
+ * in Phase 5. Public firm pages and booking read from the database instead (lib/booking/queries.ts).
+ */
+import type { Attorney, ConflictEntry, DayInfo } from "./types";
 
 export const TIME_SLOTS = [
   "9:00 AM",
@@ -7,43 +11,6 @@ export const TIME_SLOTS = [
   "1:00 PM",
   "2:30 PM",
   "4:00 PM",
-];
-
-export const PRACTICE_AREAS = [
-  "Family Law",
-  "Criminal Defense",
-  "Civil Litigation",
-  "Estate Planning",
-  "Immigration",
-  "Business Law",
-];
-
-export const LANGUAGES = ["English", "Spanish", "Mandarin", "Vietnamese"];
-
-export const LOCATIONS = ["Downtown Office", "Westside Office", "Remote/Video Only"];
-
-export const CONSULT_TYPES: ConsultType[] = [
-  {
-    id: "free-phone",
-    label: "Free 15-min Phone Screening",
-    sub: "Quick call to see if we can help",
-    price: "$0",
-    priceLabel: "$0 due today",
-  },
-  {
-    id: "video-30",
-    label: "30-min Video Consultation",
-    sub: "In-depth discussion over video",
-    price: "$150",
-    priceLabel: "$150",
-  },
-  {
-    id: "inperson-60",
-    label: "60-min In-Person Consultation",
-    sub: "Meet at one of our offices",
-    price: "$350",
-    priceLabel: "$350",
-  },
 ];
 
 export const ATTORNEYS: Attorney[] = [
@@ -134,32 +101,6 @@ export function getNext7Days(): DayInfo[] {
     });
   }
   return days;
-}
-
-export interface AttorneyFilters {
-  practiceArea?: string;
-  language?: string;
-  location?: string;
-}
-
-export function filterAttorneys(filters: AttorneyFilters): Attorney[] {
-  return ATTORNEYS.filter(
-    (a) =>
-      (!filters.practiceArea || a.practiceAreas.includes(filters.practiceArea)) &&
-      (!filters.language || a.languages.includes(filters.language)) &&
-      (!filters.location || a.location === filters.location)
-  );
-}
-
-export function getFirstAvailable(): { attorneyId: string; dateIndex: number } | null {
-  for (const a of ATTORNEYS) {
-    for (let d = 0; d < 7; d++) {
-      if (a.avail[d] && a.avail[d].length) {
-        return { attorneyId: a.id, dateIndex: d };
-      }
-    }
-  }
-  return null;
 }
 
 export function getAttorney(id: string | null): Attorney | undefined {
