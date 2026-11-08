@@ -14,7 +14,7 @@ const PHOTO_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
-const PROFILE_FIELDS = ["firstName", "middleName", "lastName", "dob", "mobile"] as const;
+const PROFILE_FIELDS = ["firstName", "middleName", "lastName", "dob", "mobile", "smsOptIn"] as const;
 
 function fromAccount(account: AccountProfile | null): SettingsState {
   return {
@@ -25,6 +25,7 @@ function fromAccount(account: AccountProfile | null): SettingsState {
     dob: account?.dateOfBirth ?? "",
     email: account?.email ?? "",
     mobile: account?.mobile ?? "",
+    smsOptIn: account?.smsOptIn ?? false,
     password: "",
     confirmPassword: "",
   };
@@ -87,6 +88,7 @@ export function useAccountSettings(
           lastName: settings.lastName,
           dateOfBirth: settings.dob,
           mobile: settings.mobile,
+          smsOptIn: settings.smsOptIn,
         });
         if (!result.ok) {
           setSaveError(result.error);

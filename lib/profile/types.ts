@@ -9,6 +9,8 @@ export interface AccountProfile {
   dateOfBirth: string;
   /** Local format (09XXXXXXXXX), or "" when not set. */
   mobile: string;
+  /** Agreed to booking texts by SMS (RA 10173 consent; can be withdrawn any time). */
+  smsOptIn: boolean;
   /** Short-lived signed URL: avatars are in a private bucket. */
   photoUrl: string | null;
 }

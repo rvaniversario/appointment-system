@@ -22,6 +22,7 @@ export interface SessionAccount {
   mobile: string | null;
   dateOfBirth: string | null;
   photoPath: string | null;
+  smsOptIn: boolean;
   /** "aal2" once the user has completed MFA in this session. */
   aal: "aal1" | "aal2";
 }
@@ -41,7 +42,7 @@ export const getSessionAccount = cache(async (): Promise<SessionAccount | null> 
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, email, first_name, middle_name, last_name, mobile, date_of_birth, photo_path")
+    .select("id, email, first_name, middle_name, last_name, mobile, date_of_birth, photo_path, sms_opt_in")
     .eq("id", data.claims.sub)
     .single();
   if (!profile) {
@@ -78,6 +79,7 @@ export const getSessionAccount = cache(async (): Promise<SessionAccount | null> 
     mobile: profile.mobile,
     dateOfBirth: profile.date_of_birth,
     photoPath: profile.photo_path,
+    smsOptIn: profile.sms_opt_in,
     aal: data.claims.aal === "aal2" ? "aal2" : "aal1",
   };
 });
@@ -100,6 +102,7 @@ export async function toAccountProfile(account: SessionAccount): Promise<Account
     lastName: account.lastName,
     dateOfBirth: account.dateOfBirth ?? "",
     mobile: formatMobile(account.mobile),
+    smsOptIn: account.smsOptIn,
     photoUrl,
   };
 }

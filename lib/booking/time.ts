@@ -43,6 +43,12 @@ export function formatDateLabel(date: string): string {
   return `${DOW[weekdayOf(date)]}, ${MON[m - 1]} ${d}`;
 }
 
+/** "Nov 9, 2026", the Manila date of an instant. */
+export function formatCalendarDate(instant: Date): string {
+  const [y, m, d] = manilaDate(instant).split("-").map(Number);
+  return `${MON[m - 1]} ${d}, ${y}`;
+}
+
 /** "9:00 AM", in Manila time. */
 export function formatTimeLabel(instant: Date): string {
   const shifted = new Date(instant.getTime() + MANILA_OFFSET_MINUTES * 60_000);

@@ -3,33 +3,43 @@
 import type { ChangeEvent } from "react";
 import { PasswordInput } from "@/components/booking/password-input";
 import type { AccountSettings } from "@/components/account/use-account-settings";
-import type { PortalInvoice, SettingsTab } from "@/lib/booking/types";
+import type { SettingsTab } from "@/lib/booking/types";
+import type { PortalInvoice } from "@/lib/portal/types";
+import type { InvoiceStatus } from "@/lib/supabase/database.types";
 import { initialsOf } from "@/lib/booking/data";
-import { linkButton, settingsFieldStyle } from "@/lib/booking/ui";
+import { badge, linkButton, settingsFieldStyle } from "@/lib/booking/ui";
 
 const errorTextStyle = { fontSize: 12.5, color: "oklch(0.55 0.16 25)" };
+
+const INVOICE_STATUS: Record<InvoiceStatus, { label: string; tone: Parameters<typeof badge>[0] }> = {
+  due: { label: "Due", tone: "red" },
+  paid: { label: "Paid", tone: "green" },
+  refunded: { label: "Refunded", tone: "grey" },
+  void: { label: "Void", tone: "grey" },
+};
 
 interface SettingsScreenProps {
   account: AccountSettings;
   /** Off for clients, who sign in with an emailed code and have no password. */
   showPasswordFields: boolean;
+  /** Clients choose whether to get booking texts. */
+  showSmsOptIn?: boolean;
   settingsTab: SettingsTab;
   availableTabs: { key: SettingsTab; label: string }[];
   portalInvoiceItems: PortalInvoice[];
   onBack: () => void;
   onSetTab: (tab: SettingsTab) => void;
-  onPayInvoice: (id: number) => void;
 }
 
 export function SettingsScreen({
   account,
   showPasswordFields,
+  showSmsOptIn = false,
   settingsTab,
   availableTabs,
   portalInvoiceItems,
   onBack,
   onSetTab,
-  onPayInvoice,
 }: SettingsScreenProps) {
   const { settings, saving, saved, saveError, passwordError, photoUploading, photoError, onFieldChange } = account;
   const fullName = [settings.firstName, settings.lastName].filter(Boolean).join(" ");
@@ -262,6 +272,20 @@ export function SettingsScreen({
                     style={settingsFieldStyle}
                   />
                 </div>
+                {showSmsOptIn && (
+                  <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, color: "oklch(0.35 0.01 258)", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={settings.smsOptIn}
+                      onChange={(e) => onFieldChange({ smsOptIn: e.target.checked })}
+                      style={{ marginTop: 3 }}
+                    />
+                    <span>
+                      Send me booking confirmations and reminders by SMS. Texts include only the date, time and
+                      attorney, never case details.
+                    </span>
+                  </label>
+                )}
                 {showPasswordFields && (
                   <>
                     <div style={{ height: 1, background: "oklch(0.92 0.005 90)", margin: "6px 0" }} />
@@ -353,8 +377,11 @@ export function SettingsScreen({
 
           {settingsTab === "billing" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {portalInvoiceItems.length === 0 && (
+                <div style={{ fontSize: 14, color: "oklch(0.55 0.01 258)" }}>No invoices yet.</div>
+              )}
               {portalInvoiceItems.map((inv) => {
-                const isDue = inv.status === "due";
+                const status = INVOICE_STATUS[inv.status];
                 return (
                   <div
                     key={inv.id}
@@ -370,45 +397,17 @@ export function SettingsScreen({
                   >
                     <div>
                       <div style={{ fontSize: 14.5, fontWeight: 600, color: "oklch(0.25 0.01 258)" }}>
-                        {inv.desc}
+                        {inv.description}
                       </div>
                       <div style={{ fontSize: 13, color: "oklch(0.55 0.01 258)", marginTop: 2 }}>
-                        {inv.date}
+                        {inv.firmName} · {inv.dateLabel}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                       <span style={{ fontSize: 15, fontWeight: 700, color: "oklch(0.28 0.05 258)" }}>
-                        {inv.amount}
+                        {inv.amountLabel}
                       </span>
-                      {isDue && (
-                        <button
-                          onClick={() => onPayInvoice(inv.id)}
-                          style={{
-                            padding: "8px 14px",
-                            border: "none",
-                            borderRadius: 7,
-                            background: "oklch(0.28 0.05 258)",
-                            color: "#fff",
-                            fontSize: 13,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Pay now
-                        </button>
-                      )}
-                      <span
-                        style={{
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          padding: "4px 10px",
-                          borderRadius: 20,
-                          background: isDue ? "oklch(0.95 0.03 25)" : "oklch(0.95 0.02 150)",
-                          color: isDue ? "oklch(0.5 0.14 25)" : "oklch(0.4 0.07 150)",
-                        }}
-                      >
-                        {isDue ? "Due" : "Paid"}
-                      </span>
+                      <span style={{ ...badge(status.tone), fontSize: 12.5 }}>{status.label}</span>
                     </div>
                   </div>
                 );

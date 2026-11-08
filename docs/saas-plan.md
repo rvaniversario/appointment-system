@@ -120,6 +120,43 @@ As in the original plan, firm-scoped, plus:
   cancellation policy.
 - Portal lists items across firms with a firm label. Messaging stays within a firm.
 
+It ships as three PRs, each branched off master:
+
+| PR | Scope |
+| --- | --- |
+| 5a: client portal (done) | Appointments, messages, documents, invoices, SMS opt-in |
+| 5b: staff dashboard | Calendar, intake queue, conflicts, analytics, meeting links, availability, staff side of messages and documents |
+| 5c: firm settings and staff | Settings listed above, staff invites, attorney management |
+
+Decisions:
+- **Staff invites** are one-time links, valid for 7 days, that a partner or admin copies and sends
+  themselves. Phase 6 emails them automatically.
+- **A client canceling a paid consultation** before the cutoff frees the time and shows the payment
+  as "refund due" on Billing. A partner refunds it with the existing button. Nothing is refunded
+  automatically.
+- **Partners and admins** (`is_firm_manager`) manage firm settings, staff and attorneys. Attorneys
+  edit only their own profile and availability.
+
+5a details:
+- The portal lists bookings that were ever confirmed (`appointments.confirmed_at`), so abandoned
+  holds and checkouts never show. Every query also filters to the signed-in client, because
+  staff can be clients of another firm.
+- Clients cancel or reschedule online up to `firms.cancellation_cutoff_hours` (default 24) before
+  the start. A reschedule keeps the attorney and length, and accepts only times the server offers.
+  Both are written to `audit_log`.
+- Clients can message any attorney they've had a booking with. Read receipts go through
+  `mark_thread_read()`, so a sent message can't be edited.
+- Documents uploaded in the portal belong to one firm, chosen by the client, and are capped at
+  100 per firm. Downloads use 60-second signed links.
+- Carried forward from 5a:
+  - Staff can't read or answer portal messages yet (5b). The portal checks for replies every
+    30 seconds; email alerts come in Phase 6.
+  - Changing the sign-in email waits for Phase 6, which sets up reliable email for the
+    confirmation messages.
+  - No invoice is ever "due" yet: invoices are only created when an online payment succeeds. A
+    "Pay now" button arrives with staff-issued invoices.
+  - The cancellation cutoff is fixed at 24 hours until firm settings (5c) can change it.
+
 ## Phase 6: Notifications
 As in the original plan, plus:
 - Email sends from our verified domain with the firm's name as sender and its address as reply-to.

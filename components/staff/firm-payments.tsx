@@ -35,7 +35,7 @@ export async function FirmPayments() {
   const appointmentIds = [...new Set((payments ?? []).map((p) => p.appointment_id).filter((id): id is string => Boolean(id)))];
   const [{ data: intakes }, { data: appointments }] = await Promise.all([
     supabase.from("intakes").select("appointment_id, first_name, last_name").in("appointment_id", appointmentIds),
-    supabase.from("appointments").select("id, starts_at, status").in("id", appointmentIds),
+    supabase.from("appointments").select("id, starts_at, status, cancel_reason").in("id", appointmentIds),
   ]);
   const clientName = new Map((intakes ?? []).map((i) => [i.appointment_id, `${i.first_name} ${i.last_name}`]));
   const appointmentById = new Map((appointments ?? []).map((a) => [a.id, a]));
@@ -80,7 +80,11 @@ export async function FirmPayments() {
                     <td style={cell}>{startsAt ? `${formatDateLabel(manilaDate(startsAt))}, ${formatTimeLabel(startsAt)}` : "—"}</td>
                     <td style={cell}>{formatPeso(p.amount_centavos)}</td>
                     <td style={{ ...cell, color: needsRefund ? "oklch(0.55 0.16 25)" : status.color, fontWeight: 600 }}>
-                      {needsRefund ? "Paid, booking released — refund due" : status.label}
+                      {needsRefund
+                        ? appointment?.cancel_reason === "canceled by client"
+                          ? "Paid, client canceled — refund due"
+                          : "Paid, booking released — refund due"
+                        : status.label}
                     </td>
                     <td style={{ ...cell, textAlign: "right" }}>
                       {p.status === "paid" && (

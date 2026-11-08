@@ -55,6 +55,7 @@ export interface Database {
           contact_email: string | null;
           contact_phone: string | null;
           agreement_text: string | null;
+          cancellation_cutoff_hours: number;
           created_at: Ts;
           updated_at: Ts;
         },
@@ -132,6 +133,7 @@ export interface Database {
           canceled_at: Ts | null;
           cancel_reason: string | null;
           booking_token_hash: string | null;
+          confirmed_at: Ts | null;
           created_at: Ts;
           updated_at: Ts;
         },
@@ -318,6 +320,7 @@ export interface Database {
       firm_can_accept_bookings: { Args: { p_firm: Uuid }; Returns: boolean };
       run_conflict_check: { Args: { p_appointment: Uuid }; Returns: number };
       firm_accepts_payments: { Args: { p_firm: Uuid }; Returns: boolean };
+      mark_thread_read: { Args: { p_thread: Uuid }; Returns: undefined };
     };
     Enums: {
       firm_role: FirmRole;
