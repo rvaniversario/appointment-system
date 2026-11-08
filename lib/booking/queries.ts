@@ -149,6 +149,21 @@ export async function getAvailability(input: {
   });
 }
 
+/**
+ * Expired holds and unpaid checkouts still count for the no-overlap constraint until they're
+ * released. Call this before taking a time, so a lapsed hold doesn't block it.
+ */
+export async function releaseLapsedHolds(attorneyId: string, startsAt: Date, endsAt: Date): Promise<void> {
+  await createAdminClient()
+    .from("appointments")
+    .update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "hold expired" })
+    .eq("attorney_id", attorneyId)
+    .in("status", ["held", "pending_payment"])
+    .lt("hold_expires_at", new Date().toISOString())
+    .lt("starts_at", endsAt.toISOString())
+    .gt("ends_at", startsAt.toISOString());
+}
+
 export interface SlotPageData {
   fromDate: string;
   days: DaySlots[];

@@ -1,42 +1,24 @@
-"use client";
+import { AutoRefresh } from "@/components/booking/auto-refresh";
+import { MessagesView } from "@/components/portal/messages-view";
+import { PortalPage } from "@/components/portal/portal-page";
+import { requireClient } from "@/lib/auth/session";
+import { getPortalContacts, getThreadMessages } from "@/lib/portal/queries";
 
-import { useRouter } from "next/navigation";
-import { PortalScreen } from "@/components/booking/screens/portal-screen";
-import { usePortalSession } from "@/components/portal/portal-session-context";
+export const metadata = { title: "Messages" };
 
-export default function PortalMessagesPage() {
-  const router = useRouter();
-  const {
-    state,
-    days,
-    messagingAttorneyName,
-    startReschedule,
-    cancelAppointment,
-    cancelRescheduleUI,
-    setRescheduleDate,
-    setRescheduleTime,
-    confirmReschedule,
-    onPortalMessageDraft,
-    sendPortalMessage,
-    addPortalDocument,
-  } = usePortalSession();
+export default async function PortalMessagesPage({ searchParams }: PageProps<"/portal/messages">) {
+  const account = await requireClient();
+  const { with: withParam } = await searchParams;
+  const contacts = await getPortalContacts(account);
+  const selected = contacts.find((c) => c.attorneyId === withParam) ?? contacts[0] ?? null;
+  const messages = selected?.threadId ? await getThreadMessages(account, selected.threadId) : [];
+  const unreadElsewhere = contacts.filter((c) => c !== selected).reduce((n, c) => n + c.unread, 0);
 
   return (
-    <PortalScreen
-      activeTab="messages"
-      portal={state}
-      days={days}
-      messagingAttorneyName={messagingAttorneyName}
-      onGoHome={() => router.push("/")}
-      onReschedule={startReschedule}
-      onCancel={cancelAppointment}
-      onCancelRescheduleUI={cancelRescheduleUI}
-      onSetRescheduleDate={setRescheduleDate}
-      onSetRescheduleTime={setRescheduleTime}
-      onConfirmReschedule={confirmReschedule}
-      onMessageDraftChange={onPortalMessageDraft}
-      onSendMessage={sendPortalMessage}
-      onAddDocument={addPortalDocument}
-    />
+    <PortalPage active="messages" unread={unreadElsewhere}>
+      {/* Replies arrive without a reload; Phase 6 adds email alerts. */}
+      <AutoRefresh seconds={30} />
+      <MessagesView contacts={contacts} selected={selected} messages={messages} />
+    </PortalPage>
   );
 }

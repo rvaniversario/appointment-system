@@ -63,48 +63,6 @@ export interface AgreementState {
   signature: string;
 }
 
-export interface PortalAppointment {
-  id: number;
-  attorneyId: string;
-  dateLabel: string;
-  dateIndex: number | null;
-  time: string;
-  type: string;
-  status: "upcoming" | "canceled";
-}
-
-export interface PortalMessage {
-  from: "attorney" | "client";
-  text: string;
-}
-
-export interface PortalDocument {
-  name: string;
-}
-
-export interface PortalInvoice {
-  id: number;
-  desc: string;
-  amount: string;
-  date: string;
-  status: "due" | "paid";
-}
-
-export type PortalTab = "appointments" | "messages" | "documents";
-
-export interface PortalState {
-  loginEmail: string;
-  code: string;
-  appointments: PortalAppointment[];
-  rescheduleId: number | null;
-  rescheduleDateIndex: number | null;
-  rescheduleTime: string | null;
-  messages: PortalMessage[];
-  messageDraft: string;
-  documents: PortalDocument[];
-  invoices: PortalInvoice[];
-}
-
 export type AdminRole = "attorney" | "partner";
 export type AdminTab = "calendar" | "queue" | "conflicts" | "analytics" | "billing";
 
@@ -138,6 +96,7 @@ export interface SettingsState {
   dob: string;
   email: string;
   mobile: string;
+  smsOptIn: boolean;
   password: string;
   confirmPassword: string;
 }

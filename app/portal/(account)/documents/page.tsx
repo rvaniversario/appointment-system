@@ -1,42 +1,17 @@
-"use client";
+import { DocumentsView } from "@/components/portal/documents-view";
+import { PortalPage } from "@/components/portal/portal-page";
+import { requireClient } from "@/lib/auth/session";
+import { getClientFirms, getPortalDocuments } from "@/lib/portal/queries";
 
-import { useRouter } from "next/navigation";
-import { PortalScreen } from "@/components/booking/screens/portal-screen";
-import { usePortalSession } from "@/components/portal/portal-session-context";
+export const metadata = { title: "Documents" };
 
-export default function PortalDocumentsPage() {
-  const router = useRouter();
-  const {
-    state,
-    days,
-    messagingAttorneyName,
-    startReschedule,
-    cancelAppointment,
-    cancelRescheduleUI,
-    setRescheduleDate,
-    setRescheduleTime,
-    confirmReschedule,
-    onPortalMessageDraft,
-    sendPortalMessage,
-    addPortalDocument,
-  } = usePortalSession();
+export default async function PortalDocumentsPage() {
+  const account = await requireClient();
+  const [documents, firms] = await Promise.all([getPortalDocuments(account), getClientFirms(account)]);
 
   return (
-    <PortalScreen
-      activeTab="documents"
-      portal={state}
-      days={days}
-      messagingAttorneyName={messagingAttorneyName}
-      onGoHome={() => router.push("/")}
-      onReschedule={startReschedule}
-      onCancel={cancelAppointment}
-      onCancelRescheduleUI={cancelRescheduleUI}
-      onSetRescheduleDate={setRescheduleDate}
-      onSetRescheduleTime={setRescheduleTime}
-      onConfirmReschedule={confirmReschedule}
-      onMessageDraftChange={onPortalMessageDraft}
-      onSendMessage={sendPortalMessage}
-      onAddDocument={addPortalDocument}
-    />
+    <PortalPage active="documents">
+      <DocumentsView documents={documents} firms={firms} />
+    </PortalPage>
   );
 }

@@ -30,6 +30,8 @@ const profileSchema = z.object({
     .string()
     .trim()
     .refine((v) => !v || normalizeMobile(v) !== null, "Enter a Philippine mobile number, like 0917 123 4567."),
+  /** Left unchanged when omitted. */
+  smsOptIn: z.boolean().optional(),
 });
 
 export type ProfileInput = z.input<typeof profileSchema>;
@@ -48,7 +50,7 @@ export async function updateProfile(input: ProfileInput): Promise<ActionResult> 
 
   const parsed = profileSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { firstName, middleName, lastName, dateOfBirth, mobile } = parsed.data;
+  const { firstName, middleName, lastName, dateOfBirth, mobile, smsOptIn } = parsed.data;
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -59,6 +61,7 @@ export async function updateProfile(input: ProfileInput): Promise<ActionResult> 
       last_name: lastName,
       date_of_birth: dateOfBirth || null,
       mobile: mobile ? normalizeMobile(mobile) : null,
+      ...(smsOptIn === undefined ? {} : { sms_opt_in: smsOptIn }),
     })
     .eq("id", account.id)
     // Returning the row makes an update that matched nothing an error instead of a silent success.

@@ -20,7 +20,6 @@ export default function StaffSettingsPage() {
       portalInvoiceItems={[]}
       onBack={() => router.push("/staff/calendar")}
       onSetTab={() => {}}
-      onPayInvoice={() => {}}
     />
   );
 }

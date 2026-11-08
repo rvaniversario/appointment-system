@@ -1,38 +1,4 @@
-import type { AdminState, PortalState, WizardState } from "./types";
-
-export function createInitialPortalState(): PortalState {
-  return {
-    loginEmail: "",
-    code: "",
-    appointments: [
-      {
-        id: 1,
-        attorneyId: "ramirez",
-        dateLabel: "Fri, Aug 14",
-        dateIndex: null,
-        time: "1:00 PM",
-        type: "30-min Video Consultation",
-        status: "upcoming",
-      },
-    ],
-    rescheduleId: null,
-    rescheduleDateIndex: null,
-    rescheduleTime: null,
-    messages: [
-      {
-        from: "attorney",
-        text: "Thanks for your intake — looking forward to our consultation on Aug 14.",
-      },
-      { from: "client", text: "Thank you, see you then!" },
-    ],
-    messageDraft: "",
-    documents: [{ name: "Passport copy.pdf" }, { name: "Lease agreement.pdf" }],
-    invoices: [
-      { id: 1, desc: "30-min Video Consultation", amount: "$150", date: "Aug 14, 2026", status: "due" },
-      { id: 2, desc: "Retainer deposit", amount: "$1,000", date: "Jul 2, 2026", status: "paid" },
-    ],
-  };
-}
+import type { AdminState, WizardState } from "./types";
 
 export function createInitialAdminState(): AdminState {
   return {

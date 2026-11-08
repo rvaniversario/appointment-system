@@ -122,6 +122,27 @@ export const sectionTitle: CSSProperties = {
   margin: "0 0 6px",
 };
 
+/** Page heading in the client portal. */
+export const portalHeading: CSSProperties = {
+  fontFamily: "var(--font-lora), serif",
+  fontSize: 22,
+  fontWeight: 600,
+  color: "oklch(0.25 0.01 258)",
+  margin: "0 0 18px",
+};
+
+/** A small pill, e.g. an appointment's status. */
+export function badge(tone: "green" | "red" | "amber" | "grey"): CSSProperties {
+  const tones = {
+    green: ["oklch(0.95 0.02 150)", "oklch(0.4 0.07 150)"],
+    red: ["oklch(0.95 0.03 25)", "oklch(0.5 0.14 25)"],
+    amber: ["oklch(0.97 0.02 85)", "oklch(0.5 0.08 85)"],
+    grey: ["oklch(0.95 0.005 90)", "oklch(0.5 0.01 258)"],
+  } as const;
+  const [background, color] = tones[tone];
+  return { fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 20, whiteSpace: "nowrap", background, color };
+}
+
 export const pageSub: CSSProperties = {
   fontSize: 15,
   color: "oklch(0.5 0.01 258)",

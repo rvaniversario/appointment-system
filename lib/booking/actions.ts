@@ -10,6 +10,7 @@ import { publicEnv } from "@/lib/env";
 import { paymentsConfigured } from "@/lib/env.server";
 import { createCheckoutSession, expireCheckoutSession, PaymongoError } from "@/lib/payments/paymongo";
 import { CHECKOUT_MINUTES } from "@/lib/payments/settle";
+import { ALLOWED_DOCUMENT_TYPES, DOCUMENTS_BUCKET, MAX_DOCUMENT_BYTES, safeFileName } from "@/lib/documents/rules";
 import { buildAgreement } from "./agreement";
 import {
   BOOKING_RULES,
@@ -19,6 +20,7 @@ import {
   getFirmAttorney,
   getPublicFirm,
   getSlotPage,
+  releaseLapsedHolds,
   type SlotPageData,
 } from "./queries";
 import { getBookingFromCookie, isLiveHold, newBookingToken, setBookingCookie, type BookingRow } from "./session";
@@ -139,15 +141,7 @@ export async function holdSlot(input: {
 
   const endsAt = new Date(startsAt.getTime() + consultType.durationMinutes * 60_000);
 
-  // Expired holds and unpaid checkouts still count for the no-overlap constraint until released.
-  await admin
-    .from("appointments")
-    .update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "hold expired" })
-    .eq("attorney_id", attorney.id)
-    .in("status", ["held", "pending_payment"])
-    .lt("hold_expires_at", new Date().toISOString())
-    .lt("starts_at", endsAt.toISOString())
-    .gt("ends_at", startsAt.toISOString());
+  await releaseLapsedHolds(attorney.id, startsAt, endsAt);
 
   const fields = {
     firm_id: firm.id,
@@ -299,25 +293,12 @@ export async function submitIntake(input: { firmSlug: string; intake: IntakeInpu
 // Documents
 // ---------------------------------------------------------------------------
 
-const BUCKET = "client-documents";
-const MAX_BYTES = 10 * 1024 * 1024;
+const BUCKET = DOCUMENTS_BUCKET;
 const MAX_DOCUMENTS = 10;
-const ALLOWED_TYPES = new Set([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/jpeg",
-  "image/png",
-]);
 
 export interface UploadedDocument {
   id: string;
   name: string;
-}
-
-/** Keeps letters, digits, dots, dashes and underscores, so the storage path is predictable. */
-function safeFileName(name: string): string {
-  const cleaned = name.normalize("NFKD").replace(/[^\w.-]+/g, "_").replace(/_+/g, "_").slice(-100);
-  return cleaned.replace(/^[._]+/, "") || "document";
 }
 
 export type UploadUrlResult = { ok: true; path: string; token: string } | Failure;
@@ -334,8 +315,8 @@ export async function createUploadUrl(input: {
   const clientId = live.booking.client_id;
   if (!clientId) return fail("Please complete the intake form first.");
 
-  if (!ALLOWED_TYPES.has(input.mimeType)) return fail("Upload a PDF, Word document (.docx), JPG or PNG.");
-  if (!(input.size > 0 && input.size <= MAX_BYTES)) return fail("Files must be 10 MB or smaller.");
+  if (!ALLOWED_DOCUMENT_TYPES.has(input.mimeType)) return fail("Upload a PDF, Word document (.docx), JPG or PNG.");
+  if (!(input.size > 0 && input.size <= MAX_DOCUMENT_BYTES)) return fail("Files must be 10 MB or smaller.");
 
   const admin = createAdminClient();
   const { count } = await admin

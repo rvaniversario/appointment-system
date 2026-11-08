@@ -49,7 +49,7 @@ Run the tests:
 ```bash
 npm test          # unit tests (slot generation, Manila time, webhook signatures)
 npm run db:test   # database tests: firm isolation, conflict checks, payment secrets
-npm run test:e2e  # browser tests: booking, payments (against a mock PayMongo), staff sign-in
+npm run test:e2e  # browser tests: booking, payments (against a mock PayMongo), staff sign-in, client portal
 ```
 
 `npm run test:e2e` resets the **local** database, builds the app and serves it on port 3100,
@@ -161,11 +161,14 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
 - [x] Phase 2: Multi-tenant foundation: firms, memberships, firm-scoped RLS and storage, cross-firm tests in CI
 - [x] Phase 3: Firm booking pages + booking wizard on real data (slots, holds, server-side conflict check, uploads)
 - [x] Phase 4: Per-firm PayMongo checkout + webhook for consultation fees
-- [ ] Phase 5: Portal + staff dashboard on real data, staff invites, firm settings
+- [ ] Phase 5: Portal + staff dashboard on real data, staff invites, firm settings, in three PRs:
+  - [x] 5a: Client portal on real data (appointments with reschedule/cancel, messages, documents, invoices)
+  - [ ] 5b: Staff dashboard on real data (calendar, intake queue, conflicts, analytics, availability)
+  - [ ] 5c: Firm settings, staff invites, attorney management
 - [ ] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm
 - [ ] Phase 7: Firm self-service signup + platform admin
 - [ ] Phase 8: Subscriptions (PayMongo recurring billing, plan limits, lapsed-firm handling)
 - [ ] Phase 9: Hardening and launch (CSP, rate limits, error pages, SEO, E2E tests, legal documents)
 
-Firm pages and booking use real data. Until Phase 5 lands, the client portal and staff
-dashboard **contents** still come from the sample data in `lib/booking/data.ts`.
+Firm pages, booking and the client portal use real data. Until Phase 5b lands, the staff
+dashboard **contents** (other than Billing) still come from the sample data in `lib/booking/data.ts`.
