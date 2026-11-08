@@ -125,7 +125,7 @@ It ships as three PRs, each branched off master:
 | PR | Scope |
 | --- | --- |
 | 5a: client portal (done) | Appointments, messages, documents, invoices, SMS opt-in |
-| 5b: staff dashboard | Calendar, intake queue, conflicts, analytics, meeting links, availability, staff side of messages and documents |
+| 5b: staff dashboard (done) | Calendar, intake queue, conflicts, analytics, meeting links, availability, staff side of messages and documents |
 | 5c: firm settings and staff | Settings listed above, staff invites, attorney management |
 
 Decisions:
@@ -156,6 +156,31 @@ Decisions:
   - No invoice is ever "due" yet: invoices are only created when an online payment succeeds. A
     "Pay now" button arrives with staff-issued invoices.
   - The cancellation cutoff is fixed at 24 hours until firm settings (5c) can change it.
+
+5b details:
+- Every page reads with the staff member's own permissions, so RLS decides scope: an attorney
+  sees their own bookings, messages and hours; a partner or admin sees the whole firm.
+- Each booking has a detail page with the intake, conflict matches (never shown to the client),
+  documents, agreement, payment, meeting link and outcome. The calendar and queue link to it.
+- Review: attorneys approve or decline their own bookings; partners and admins can also reassign.
+  A reassigned video call moves to the new attorney's standing link unless a custom link was set.
+  Declining a paid booking shows it on Billing as a refund due. Everything is audited.
+- Outcomes (completed, client didn't attend) can be recorded once a consultation has started.
+- Conflict search is fuzzy (`search_conflict_parties()`), and partners and admins add or remove
+  records.
+- Weekly hours are replaced in one step (`replace_weekly_hours()`). Time off blocks whole days;
+  bookings already in that time are kept, with a warning.
+- Staff can add documents to a client's file and download the client's documents; downloads are
+  audited.
+- Analytics are computed from the month's bookings, scoped by RLS. Partners and admins also see
+  fees collected online, and Billing shows fees by attorney.
+- Carried forward from 5b:
+  - Staff and clients aren't notified of new messages, approvals, declines or reassignments until
+    Phase 6. Both inboxes check for new messages every 30 seconds.
+  - Reassigning checks only that the new attorney is free at that time, not their working hours.
+  - Analytics run in app code rather than SQL views. That's fine at a firm's volume; revisit if
+    pages slow down.
+  - Linking a staff account to an attorney profile still uses `npm run staff:create` (5c).
 
 ## Phase 6: Notifications
 As in the original plan, plus:

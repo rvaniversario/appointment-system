@@ -122,8 +122,8 @@ export const sectionTitle: CSSProperties = {
   margin: "0 0 6px",
 };
 
-/** Page heading in the client portal. */
-export const portalHeading: CSSProperties = {
+/** Page heading in the client portal and staff dashboard. */
+export const pageHeading: CSSProperties = {
   fontFamily: "var(--font-lora), serif",
   fontSize: 22,
   fontWeight: 600,

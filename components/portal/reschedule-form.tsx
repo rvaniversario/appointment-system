@@ -43,9 +43,9 @@ export function RescheduleForm({ appointmentId, onClose }: { appointmentId: stri
     });
 
   // Load the first week once, when the form opens.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointmentId]);
 
   const day = page?.days.find((d) => d.date === date);

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { cancelAppointment } from "@/lib/portal/actions";
 import type { PortalAppointment } from "@/lib/portal/types";
-import { badge, card, colors, errorTextStyle, portalHeading, secondaryButton } from "@/lib/booking/ui";
+import { badge, card, colors, errorTextStyle, pageHeading, secondaryButton } from "@/lib/booking/ui";
 import { RescheduleForm } from "./reschedule-form";
 
 const STATUS: Record<string, { label: string; tone: Parameters<typeof badge>[0] }> = {
@@ -127,7 +127,7 @@ export function AppointmentsView({ appointments }: { appointments: PortalAppoint
 
   return (
     <div>
-      <h2 style={portalHeading}>Upcoming appointments</h2>
+      <h2 style={pageHeading}>Upcoming appointments</h2>
       {upcoming.length === 0 ? (
         <div style={{ ...card(), fontSize: 14, color: "oklch(0.5 0.01 258)" }}>
           You have no upcoming appointments. Book through your law firm&apos;s booking page.
@@ -142,7 +142,7 @@ export function AppointmentsView({ appointments }: { appointments: PortalAppoint
 
       {past.length > 0 && (
         <>
-          <h2 style={{ ...portalHeading, fontSize: 18, margin: "36px 0 14px" }}>Past and canceled</h2>
+          <h2 style={{ ...pageHeading, fontSize: 18, margin: "36px 0 14px" }}>Past and canceled</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {past.map((a) => (
               <AppointmentCard key={a.id} appt={a} />

@@ -2,35 +2,36 @@
 
 import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
 import { useAccountSettings, type AccountSettings } from "@/components/account/use-account-settings";
-import { getNext7Days } from "@/lib/booking/data";
-import { createInitialAdminState } from "@/lib/booking/initial-state";
 import { signOut } from "@/app/portal/actions";
 import { staffSignIn, staffVerifyTotp, updateStaffPassword } from "@/app/staff/actions";
-import type { AdminRole, AdminState, DayInfo } from "@/lib/booking/types";
 import type { AccountProfile } from "@/lib/profile/types";
+
+export type StaffRoleLabel = "attorney" | "partner";
 
 /** The signed-in staff member, resolved on the server (null when signed out or not MFA-verified). */
 export interface StaffAccount extends AccountProfile {
-  /** Dashboard role derived from the DB role: partners and admins see billing. */
-  role: AdminRole;
+  /** "partner" for partners and admins. Display only: the server checks the real role. */
+  role: StaffRoleLabel;
+}
+
+/** Sign-in form state. Dashboard data is loaded by each page on the server. */
+interface StaffLoginState {
+  loginEmail: string;
+  loginPassword: string;
+  code: string;
 }
 
 interface StaffSessionValue {
-  state: AdminState;
+  state: StaffLoginState;
   account: StaffAccount | null;
   authError: string | null;
   authPending: boolean;
-  days: DayInfo[];
   onAdminLoginEmail: (v: string) => void;
   onAdminLoginPassword: (v: string) => void;
   submitAdminLogin: () => void;
   onAdminCode: (v: string) => void;
   submitAdmin2fa: () => void;
   adminLogout: () => void;
-  onAdminConflictSearch: (v: string) => void;
-  setLeadReassign: (id: number, val: string) => void;
-  reassignLead: (id: number) => void;
-  approveLead: (id: number) => void;
   accountSettings: AccountSettings;
 }
 
@@ -43,13 +44,10 @@ export function StaffSessionProvider({
   account: StaffAccount | null;
   children: ReactNode;
 }) {
-  const [localState, setState] = useState<AdminState>(createInitialAdminState);
-  // The role always comes from the server-verified account, never from client state.
-  const state: AdminState = { ...localState, role: account?.role ?? "attorney" };
+  const [state, setState] = useState<StaffLoginState>({ loginEmail: "", loginPassword: "", code: "" });
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, startAuthTransition] = useTransition();
   const accountSettings = useAccountSettings(account, updateStaffPassword);
-  const days = getNext7Days();
 
   const onAdminLoginEmail = (v: string) => setState((s) => ({ ...s, loginEmail: v }));
   const onAdminLoginPassword = (v: string) => setState((s) => ({ ...s, loginPassword: v }));
@@ -81,43 +79,17 @@ export function StaffSessionProvider({
 
   const adminLogout = () => startAuthTransition(() => signOut());
 
-  const onAdminConflictSearch = (v: string) => setState((s) => ({ ...s, conflictSearch: v }));
-  const setLeadReassign = (id: number, val: string) =>
-    setState((s) => ({
-      ...s,
-      queue: s.queue.map((l) => (l.id === id ? { ...l, reassignTo: val } : l)),
-    }));
-  const reassignLead = (id: number) =>
-    setState((s) => ({
-      ...s,
-      queue: s.queue.map((l) =>
-        l.id === id && l.reassignTo
-          ? { ...l, attorneyId: l.reassignTo, conflict: false, status: "approved" as const, reassignTo: "" }
-          : l
-      ),
-    }));
-  const approveLead = (id: number) =>
-    setState((s) => ({
-      ...s,
-      queue: s.queue.map((l) => (l.id === id ? { ...l, status: "approved" as const } : l)),
-    }));
-
   const value: StaffSessionValue = {
     state,
     account,
     authError,
     authPending,
-    days,
     onAdminLoginEmail,
     onAdminLoginPassword,
     submitAdminLogin,
     onAdminCode,
     submitAdmin2fa,
     adminLogout,
-    onAdminConflictSearch,
-    setLeadReassign,
-    reassignLead,
-    approveLead,
     accountSettings,
   };
 

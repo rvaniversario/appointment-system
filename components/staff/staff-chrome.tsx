@@ -6,9 +6,9 @@ import { initialsOf } from "@/lib/booking/data";
 import { Header, type UserMenuData } from "@/components/booking/header";
 import { Footer } from "@/components/booking/footer";
 import { useStaffSession } from "./staff-session-context";
-import type { AdminRole } from "@/lib/booking/types";
+import type { StaffRoleLabel } from "./staff-session-context";
 
-const ROLE_LABELS: Record<AdminRole, string> = { attorney: "Attorney", partner: "Super admin" };
+const ROLE_LABELS: Record<StaffRoleLabel, string> = { attorney: "Attorney", partner: "Partner" };
 
 export function StaffChrome({ children }: { children: ReactNode }) {
   const router = useRouter();

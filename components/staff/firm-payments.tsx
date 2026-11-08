@@ -14,6 +14,12 @@ const STATUS: Record<string, { label: string; color: string }> = {
   failed: { label: "Failed", color: "oklch(0.55 0.16 25)" },
 };
 
+/** Why a paid booking was canceled, for the "refund due" label. */
+const REFUND_REASON: Record<string, string> = {
+  "canceled by client": "client canceled",
+  "declined by firm": "declined by firm",
+};
+
 const cell = { padding: "10px 12px", borderTop: "1px solid oklch(0.93 0.005 90)", fontSize: 13.5, verticalAlign: "top" } as const;
 
 /** The firm's consultation payments, read with the signed-in partner's own permissions. */
@@ -41,7 +47,7 @@ export async function FirmPayments() {
   const appointmentById = new Map((appointments ?? []).map((a) => [a.id, a]));
 
   return (
-    <section style={{ maxWidth: 1120, margin: "0 auto", padding: "32px 32px 0" }}>
+    <section style={{ marginBottom: 32 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, gap: 16 }}>
         <h2 style={{ fontFamily: "var(--font-lora), serif", fontSize: 22, fontWeight: 600, color: "oklch(0.25 0.01 258)", margin: 0 }}>
           Online payments
@@ -81,9 +87,7 @@ export async function FirmPayments() {
                     <td style={cell}>{formatPeso(p.amount_centavos)}</td>
                     <td style={{ ...cell, color: needsRefund ? "oklch(0.55 0.16 25)" : status.color, fontWeight: 600 }}>
                       {needsRefund
-                        ? appointment?.cancel_reason === "canceled by client"
-                          ? "Paid, client canceled — refund due"
-                          : "Paid, booking released — refund due"
+                        ? `Paid, ${REFUND_REASON[appointment?.cancel_reason ?? ""] ?? "booking released"} — refund due`
                         : status.label}
                     </td>
                     <td style={{ ...cell, textAlign: "right" }}>
