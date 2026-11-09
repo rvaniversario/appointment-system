@@ -96,6 +96,7 @@ function InviteForm({ unlinkedAttorneys }: { unlinkedAttorneys: { id: string; na
   const [role, setRole] = useState<FirmRole>("attorney");
   const [attorneyId, setAttorneyId] = useState("");
   const [link, setLink] = useState<string | null>(null);
+  const [emailedTo, setEmailedTo] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { message, pending, run } = useSave();
 
@@ -109,11 +110,12 @@ function InviteForm({ unlinkedAttorneys }: { unlinkedAttorneys: { id: string; na
             const result = await createInvite({ email, role, attorneyId: role === "attorney" ? attorneyId : "" });
             if (!result.ok) return result;
             setLink(result.link);
+            setEmailedTo(result.emailed ? email : null);
             setCopied(false);
             setEmail("");
             setAttorneyId("");
             return { ok: true };
-          }, "Invite created.");
+          }, "Invite sent.");
         }}
         style={{ display: "grid", gap: 12 }}
       >
@@ -145,7 +147,7 @@ function InviteForm({ unlinkedAttorneys }: { unlinkedAttorneys: { id: string; na
         )}
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button type="submit" disabled={pending} style={saveButton}>
-            {pending ? "Creating…" : "Create invite link"}
+            {pending ? "Sending…" : "Send invite"}
           </button>
           <SaveMessage message={message?.ok ? null : message} />
         </div>
@@ -154,7 +156,10 @@ function InviteForm({ unlinkedAttorneys }: { unlinkedAttorneys: { id: string; na
       {link && (
         <div role="status" style={{ ...card("14px 16px"), marginTop: 14, background: "oklch(0.97 0.02 150)" }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>
-            Send this link to them yourself. It works once, for 7 days, and won&apos;t be shown again.
+            {emailedTo
+              ? `We emailed the invite to ${emailedTo}. You can also share the link below yourself.`
+              : "We couldn't email the invite, so send this link to them yourself."}{" "}
+            It works once, for 7 days, and won&apos;t be shown again.
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <input readOnly value={link} aria-label="Invite link" onFocus={(e) => e.target.select()} style={{ ...field, fontFamily: "monospace", fontSize: 12.5 }} />

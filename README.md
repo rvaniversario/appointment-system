@@ -53,7 +53,7 @@ npm run test:e2e  # browser tests: booking, payments (mock PayMongo), staff sign
 ```
 
 `npm run test:e2e` resets the **local** database, builds the app and serves it on port 3100,
-with a mock PayMongo server on 4010. It needs Docker, `npx supabase start`, and
+with a mock PayMongo server on 4010 and a mock Resend server on 4020. It needs Docker, `npx supabase start`, and
 `npx playwright install chromium` once. Pass a suite name to run one: `npm run test:e2e -- payments`.
 
 ### Environment variables
@@ -65,7 +65,9 @@ with a mock PayMongo server on 4010. It needs Docker, `npx supabase start`, and
 | `NEXT_PUBLIC_SITE_URL` | browser + server | Canonical production URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only** | Bypasses RLS. Admin tasks only |
 | `PAYMONGO_SECRET_KEY` | **server only** | The platform's parent PayMongo account (`sk_test_…` / `sk_live_…`) |
-| `CRON_SECRET` | **server only** | Bearer token for `/api/cron/reconcile-payments` (32+ characters) |
+| `CRON_SECRET` | **server only** | Bearer token for the `/api/cron/*` jobs (32+ characters) |
+| `RESEND_API_KEY` | **server only** | Resend API key (`re_…`). Without it, no notification emails are queued or sent |
+| `EMAIL_FROM` | **server only** | Sending address on our verified domain, e.g. `notifications@mail.example.com` |
 
 `lib/env.ts` validates these at startup. Server secrets live in `lib/env.server.ts`, which
 is guarded by `server-only` so they can never be bundled into client code.
@@ -129,6 +131,29 @@ Clients have 30 minutes to pay before their time is released. `/api/cron/reconci
 runs daily (`vercel.json`) to settle payments whose webhook never arrived, because PayMongo
 doesn't resend them. Partners and admins refund from **Staff → Billing**.
 
+### Email notifications (Resend)
+
+Emails go out from `EMAIL_FROM` on our verified domain, with the firm's name as the sender
+and, for client emails, the firm's contact email as reply-to. They carry only booking facts
+(time, attorney, place, meeting link) and never case details or message text; recipients sign
+in to read those. Templates are in `lib/notify/templates.ts`, and `lib/notify/events.ts`
+decides who hears about what:
+
+| Event | Client | Staff |
+| --- | --- | --- |
+| Booking confirmed | Confirmation with an `.ics` file, plus a receipt if paid | The attorney; partners and admins too if urgent, a possible conflict, or no linked attorney |
+| Client reschedules or cancels | New time or cancellation, with an updated `.ics` | The attorney |
+| Attorney approves, declines, reassigns, sets a video link | An email for each | The new attorney, on reassignment |
+| Message | "You have a new message" | "New client message", at most once per thread every 15 minutes |
+| Refund due (cancel, decline, late payment) | Told a refund is coming | Partners and admins |
+| Staff invite | | The invitee gets the link |
+
+Emails are queued in `notification_log` (one row per email, de-duplicated by `dedupe_key`)
+and sent right after the response. Failures are retried after 1, 5, 30, 120 and 360 minutes by
+`/api/cron/send-notifications`, which pg_cron calls every five minutes through pg_net. Emails
+not sent within 24 hours are marked failed instead of going out late. Invite emails are sent
+directly, because only the link's hash is stored.
+
 ## Deploying (Vercel + Supabase)
 
 1. Create **two Supabase projects**, staging and production. Enable PITR backups on production.
@@ -145,6 +170,13 @@ doesn't resend them. Partners and admins refund from **Staff → Billing**.
    - **Multi-Factor**: TOTP enabled.
    - **Passwords**: minimum length 12, with lowercase, uppercase and digits required.
    - **SMTP**: Resend. The default Supabase mailer is rate-limited and not for production.
+   In the SQL editor, give the email worker the site's address and the cron secret (once per
+   project). Until both exist, the scheduled job does nothing:
+   ```sql
+   select vault.create_secret('https://<your-domain>', 'app_url');
+   select vault.create_secret('<CRON_SECRET>', 'cron_secret');
+   ```
+   In Resend, verify the sending domain (SPF, DKIM, DMARC) before setting `EMAIL_FROM`.
 4. In Vercel, import the repo and set the env vars above for Preview (staging project) and
    Production (production project). Use a PayMongo test key on Preview and the live key only on
    Production.
@@ -165,7 +197,10 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
   - [x] 5a: Client portal on real data (appointments with reschedule/cancel, messages, documents, invoices)
   - [x] 5b: Staff dashboard on real data (calendar, intake queue, conflicts, analytics, availability, messages)
   - [x] 5c: Firm settings, staff invites, attorney management
-- [ ] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm
+- [ ] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm, in three PRs:
+  - [x] 6a: Email notifications for bookings, payments, messages and staff invites, with a retrying queue
+  - [ ] 6b: Supabase Auth email through Resend, an emailed code for guest bookings, email change in the portal
+  - [ ] 6c: SMS through PhilSMS, 24-hour and 1-hour reminders, per-firm SMS cap
 - [ ] Phase 7: Firm self-service signup + platform admin
 - [ ] Phase 8: Subscriptions (PayMongo recurring billing, plan limits, lapsed-firm handling)
 - [ ] Phase 9: Hardening and launch (CSP, rate limits, error pages, SEO, E2E tests, legal documents)

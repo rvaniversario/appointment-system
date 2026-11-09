@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { chromium } from "playwright";
+import { to, waitForEmail } from "./mail.mjs";
 
 const BASE = "http://localhost:3100";
 const MAILPIT = "http://127.0.0.1:54324";
@@ -186,21 +187,26 @@ let existingInviteLink;
   await page.goto(`${BASE}/staff/firm/staff`);
   await page.getByRole("textbox", { name: "Email" }).fill("new@settings.test");
   await page.getByRole("combobox", { name: "Attorney profile" }).selectOption({ label: "Noel Nuevo" });
-  await page.getByRole("button", { name: "Create invite link" }).click();
+  await page.getByRole("button", { name: "Send invite" }).click();
   await page.getByLabel("Invite link").waitFor({ timeout: 10000 });
   newInviteLink = await page.getByLabel("Invite link").inputValue();
   check("an invite link is shown once", /\/staff\/invite\/[A-Za-z0-9_-]{40,}$/.test(newInviteLink), newInviteLink);
   const invites = await must(db.from("staff_invites").select("token_hash").eq("email", "new@settings.test"));
   check("only the token's hash is stored", invites.length === 1 && !newInviteLink.includes(invites[0].token_hash));
+  check("the page says the invite was emailed", await page.getByText("We emailed the invite to new@settings.test.").isVisible());
+  const inviteEmail = await waitForEmail(to("new@settings.test", /^Pia Partner invited you to Settings E2E Law/));
+  check("the invite is emailed with its link", Boolean(inviteEmail?.text.includes(newInviteLink)));
+  const logged = await must(db.from("notification_log").select("status, payload").eq("template", "staff_invite").eq("recipient", "new@settings.test"));
+  check("the invite email is logged, without the link", logged.length === 1 && logged[0].status === "sent" && !JSON.stringify(logged[0]).includes("/staff/invite/"));
 
   await page.getByRole("textbox", { name: "Email" }).fill("existing@client.test");
   await page.getByRole("combobox", { name: "Role", exact: true }).selectOption("partner");
-  await page.getByRole("button", { name: "Create invite link" }).click();
+  await page.getByRole("button", { name: "Send invite" }).click();
   await page.waitForFunction((old) => document.querySelector('input[aria-label="Invite link"]')?.value !== old, newInviteLink, { timeout: 10000 });
   existingInviteLink = await page.getByLabel("Invite link").inputValue();
 
   await page.getByRole("textbox", { name: "Email" }).fill("atty@settings.test");
-  await page.getByRole("button", { name: "Create invite link" }).click();
+  await page.getByRole("button", { name: "Send invite" }).click();
   await page.getByText("That person is already on your staff.").waitFor({ timeout: 10000 });
   check("inviting an existing member is refused", true);
 

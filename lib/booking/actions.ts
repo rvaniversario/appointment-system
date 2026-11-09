@@ -10,6 +10,7 @@ import { publicEnv } from "@/lib/env";
 import { paymentsConfigured } from "@/lib/env.server";
 import { createCheckoutSession, expireCheckoutSession, PaymongoError } from "@/lib/payments/paymongo";
 import { CHECKOUT_MINUTES } from "@/lib/payments/settle";
+import { notifyBookingConfirmed } from "@/lib/notify/events";
 import { ALLOWED_DOCUMENT_TYPES, DOCUMENTS_BUCKET, MAX_DOCUMENT_BYTES, safeFileName } from "@/lib/documents/rules";
 import { buildAgreement } from "./agreement";
 import {
@@ -461,7 +462,7 @@ export async function confirmFreeBooking(input: { firmSlug: string }): Promise<{
     admin.from("attorneys").select("meeting_url").eq("id", booking.attorney_id).single(),
   ]);
 
-  const { error } = await admin
+  const { data: confirmed, error } = await admin
     .from("appointments")
     .update({
       status: "confirmed",
@@ -469,11 +470,14 @@ export async function confirmFreeBooking(input: { firmSlug: string }): Promise<{
       meeting_url: consultType?.mode === "video" ? (attorney?.meeting_url ?? null) : null,
     })
     .eq("id", booking.id)
-    .eq("status", "held");
+    .eq("status", "held")
+    .select("id")
+    .maybeSingle();
   if (error) {
     console.error("[booking] confirm failed", { code: error.code, message: error.message });
     return fail(GENERIC);
   }
+  if (confirmed) await notifyBookingConfirmed(booking.id);
   return { ok: true };
 }
 

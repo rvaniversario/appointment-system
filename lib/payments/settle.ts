@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
+import { notifyBookingConfirmed, notifyPaymentUnplaced } from "@/lib/notify/events";
 import { expireCheckoutSession, getCheckoutSession } from "./paymongo";
 
 /** How long a client has to finish paying before their time is released. */
@@ -92,6 +93,7 @@ export async function settlePaidPayment(input: {
 
   if (confirmed) {
     await audit(admin, payment.firm_id, "payment.confirmed_booking", payment.id, { appointment_id: appointment?.id ?? null });
+    await notifyBookingConfirmed(confirmed.id, payment.id);
     return "confirmed";
   }
   if (appointment?.status === "confirmed") return "confirmed";
@@ -101,6 +103,7 @@ export async function settlePaidPayment(input: {
     appointment_id: appointment?.id ?? null,
     reason: error?.code === "23P01" ? "time was booked by someone else" : "booking no longer exists",
   });
+  await notifyPaymentUnplaced(payment.id);
   return "needs_refund";
 }
 

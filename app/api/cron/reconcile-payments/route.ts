@@ -1,21 +1,12 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { cronSecret, paymentsConfigured } from "@/lib/env.server";
+import { isCronRequest } from "@/lib/cron";
+import { paymentsConfigured } from "@/lib/env.server";
 import { syncPendingPayment } from "@/lib/payments/settle";
 
 /** Leave very recent checkouts to the webhook. */
 const MIN_AGE_MINUTES = 2;
 const BATCH = 100;
-
-function authorized(request: NextRequest): boolean {
-  const secret = cronSecret();
-  const header = request.headers.get("authorization") ?? "";
-  if (!secret) return false;
-  const a = Buffer.from(header);
-  const b = Buffer.from(`Bearer ${secret}`);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 /**
  * Settles payments whose webhook never arrived and releases unpaid checkouts. PayMongo
@@ -23,7 +14,7 @@ function authorized(request: NextRequest): boolean {
  * with "Authorization: Bearer $CRON_SECRET" (Vercel Cron sends that header itself).
  */
 export async function GET(request: NextRequest) {
-  if (!authorized(request)) return new NextResponse(null, { status: 401 });
+  if (!isCronRequest(request)) return new NextResponse(null, { status: 401 });
   if (!paymentsConfigured()) return NextResponse.json({ skipped: "payments not configured" });
 
   const { data: pending } = await createAdminClient()

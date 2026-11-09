@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { publicEnv } from "@/lib/env";
 import { getStaffContext, type StaffContext } from "@/lib/staff/queries";
+import { sendInviteEmail } from "@/lib/notify/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FirmRole, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -401,8 +402,12 @@ const inviteSchema = z.object({
   attorneyId: z.union([z.literal(""), uuid]),
 });
 
-/** Creates a one-time invite link, shown once. Only its hash is stored. */
-export async function createInvite(input: { email: string; role: FirmRole; attorneyId: string }): Promise<{ ok: true; link: string } | Failure> {
+/** Creates a one-time invite link, emails it and shows it once. Only its hash is stored. */
+export async function createInvite(input: {
+  email: string;
+  role: FirmRole;
+  attorneyId: string;
+}): Promise<{ ok: true; link: string; emailed: boolean } | Failure> {
   const ctx = await managerContext();
   if (!ctx) return fail(MANAGERS_ONLY);
   const parsed = inviteSchema.safeParse({ ...input, email: input.email.trim().toLowerCase() });
@@ -433,6 +438,7 @@ export async function createInvite(input: { email: string; role: FirmRole; attor
     .is("revoked_at", null);
 
   const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + INVITE_DAYS * 86_400_000).toISOString();
   const { data, error } = await admin
     .from("staff_invites")
     .insert({
@@ -442,14 +448,24 @@ export async function createInvite(input: { email: string; role: FirmRole; attor
       attorney_id: attorneyId || null,
       token_hash: hashInviteToken(token),
       invited_by: ctx.account.id,
-      expires_at: new Date(Date.now() + INVITE_DAYS * 86_400_000).toISOString(),
+      expires_at: expiresAt,
     })
     .select("id")
     .single();
   if (error || !data) return fail(GENERIC);
-  await audit(ctx, "staff.invited", "staff_invites", data.id, { email, role });
+  const link = `${publicEnv.NEXT_PUBLIC_SITE_URL}/staff/invite/${token}`;
+  const { sent } = await sendInviteEmail({
+    firmId: ctx.firmId,
+    inviteId: data.id,
+    to: email,
+    inviterName: `${ctx.account.firstName} ${ctx.account.lastName}`.trim() || "Your firm",
+    role,
+    link,
+    expiresAt,
+  });
+  await audit(ctx, "staff.invited", "staff_invites", data.id, { email, role, emailed: sent });
   revalidatePath("/staff/firm/staff");
-  return { ok: true, link: `${publicEnv.NEXT_PUBLIC_SITE_URL}/staff/invite/${token}` };
+  return { ok: true, link, emailed: sent };
 }
 
 export async function revokeInvite(input: { inviteId: string }): Promise<FirmResult> {

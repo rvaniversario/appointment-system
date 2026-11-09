@@ -39,6 +39,31 @@ export function paymentsEnv() {
 
 export const paymentsConfigured = () => paymentsSchema.safeParse({ PAYMONGO_SECRET_KEY: process.env.PAYMONGO_SECRET_KEY }).success;
 
+const emailSchema = z.object({
+  RESEND_API_KEY: z.string().regex(/^re_/, "must be a Resend API key (re_…)"),
+  /** A bare address on our verified domain, e.g. notifications@mail.example.com. Firm names go in front of it. */
+  EMAIL_FROM: z.email(),
+  /** Overridable so tests can point at a local mock. */
+  RESEND_API_BASE: z.url().default("https://api.resend.com"),
+});
+
+let cachedEmail: z.infer<typeof emailSchema> | null = null;
+
+/** Resend settings. Throws if email isn't configured; check emailConfigured() first. */
+export function emailEnv() {
+  if (!cachedEmail) {
+    cachedEmail = emailSchema.parse({
+      RESEND_API_KEY: process.env.RESEND_API_KEY,
+      EMAIL_FROM: process.env.EMAIL_FROM,
+      RESEND_API_BASE: process.env.RESEND_API_BASE || undefined,
+    });
+  }
+  return cachedEmail;
+}
+
+export const emailConfigured = () =>
+  emailSchema.safeParse({ RESEND_API_KEY: process.env.RESEND_API_KEY, EMAIL_FROM: process.env.EMAIL_FROM }).success;
+
 /** Shared secret that scheduled jobs send as "Authorization: Bearer <secret>". */
 export function cronSecret(): string | null {
   const value = process.env.CRON_SECRET;
