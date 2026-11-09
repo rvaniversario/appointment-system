@@ -69,3 +69,28 @@ export function cronSecret(): string | null {
   const value = process.env.CRON_SECRET;
   return value && value.length >= 32 ? value : null;
 }
+
+const smsSchema = z.object({
+  PHILSMS_API_TOKEN: z.string().min(10),
+  /** The sender name PhilSMS approved for us: up to 11 letters and digits, or a number. */
+  PHILSMS_SENDER_ID: z.string().regex(/^([A-Za-z0-9 ]{1,11}|\d{10,15})$/, "must be an approved PhilSMS sender ID (up to 11 letters or digits)"),
+  /** Overridable so tests can point at a local mock. */
+  PHILSMS_API_BASE: z.url().default("https://app.philsms.com/api/v3"),
+});
+
+let cachedSms: z.infer<typeof smsSchema> | null = null;
+
+/** PhilSMS settings. Throws if SMS isn't configured; check smsConfigured() first. */
+export function smsEnv() {
+  if (!cachedSms) {
+    cachedSms = smsSchema.parse({
+      PHILSMS_API_TOKEN: process.env.PHILSMS_API_TOKEN,
+      PHILSMS_SENDER_ID: process.env.PHILSMS_SENDER_ID,
+      PHILSMS_API_BASE: process.env.PHILSMS_API_BASE || undefined,
+    });
+  }
+  return cachedSms;
+}
+
+export const smsConfigured = () =>
+  smsSchema.safeParse({ PHILSMS_API_TOKEN: process.env.PHILSMS_API_TOKEN, PHILSMS_SENDER_ID: process.env.PHILSMS_SENDER_ID }).success;

@@ -221,7 +221,7 @@ It ships as three PRs, each branched off master:
 | --- | --- |
 | 6a: email notifications (done) | Resend sender, retrying send queue, booking, payment, message and review emails, staff alerts, invite emails |
 | 6b: account email (done) | Supabase Auth SMTP through Resend, an emailed code before a guest booking is confirmed, email change in the portal |
-| 6c: SMS and reminders | PhilSMS sender, 24-hour and 1-hour reminders by email and SMS, per-firm monthly SMS cap |
+| 6c: SMS and reminders (done) | PhilSMS sender, 24-hour and 1-hour reminders by email and SMS, per-firm monthly SMS cap |
 
 Decisions:
 - **Scheduling**: pg_cron calls `/api/cron/send-notifications` every five minutes through pg_net,
@@ -283,6 +283,32 @@ Decisions:
   - A guest who switches attorney mid-booking starts a new booking and confirms the code again.
   - Past bookings and intakes keep the email they were made with; only the account changes.
   - Staff sign-in emails can only be changed by an operator in the Supabase dashboard.
+
+6c details:
+- **Reminders**: confirmed bookings at active firms get a day-before reminder (sent 20 to 24
+  hours ahead, only for bookings made more than a day ahead) and an hour-before reminder (10 to
+  60 minutes ahead, only for bookings made at least two hours ahead). The window's slack lets
+  the five-minute worker catch up after an outage without reminding someone too late.
+  - `due_reminders()` lists what just came due; `claim_due_reminders()` records each (booking,
+    kind, start time) in `appointment_reminders` once, so a rescheduled booking is reminded of
+    its new time and two workers can't both claim one.
+  - pg_cron's worker now also wakes the app when a reminder is due, not only for queued rows.
+  - At send time a reminder is skipped if its booking was canceled, moved or already started.
+- **Texts**: PhilSMS (`POST /api/v3/sms/send`) under one approved sender ID, with the firm's
+  name opening the message. Sent only when the client opted in on that booking's intake, to
+  the number given there. Texts carry who, when and how, never case details or the meeting
+  link. They share the email queue (`notification_log`, channel `sms`).
+  - PhilSMS has no idempotency key, so only failures where nothing was sent (connection
+    refused, 429, 5xx) are retried; a timeout is final rather than risking a double text.
+- **Cap**: `firms.sms_monthly_cap` (default 200), counted per Philippine calendar month in
+  `sms_usage` by `reserve_sms()` in one statement. A text the provider refused is given back.
+  Over the cap the text is logged as skipped, the email still goes, and partners and admins
+  get one email that month. Managers see the count under Staff → Firm; an operator changes the
+  cap in SQL until Phase 8.
+- Carried forward from 6c:
+  - Delivery reports (delivered/failed after PhilSMS accepts a text) aren't recorded.
+  - Staff don't get reminders; their calendar is the source of truth.
+  - Clients can't opt out of email reminders (they're transactional); texts are opt-in per booking.
 
 ## Phase 7: Firm signup and platform admin
 - Self-service signup: account, mandatory MFA, firm name and slug, first attorney, go live.

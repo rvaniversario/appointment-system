@@ -24,6 +24,7 @@ export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "expire
 export type InvoiceStatus = "due" | "paid" | "void" | "refunded";
 export type NotificationChannel = "email" | "sms";
 export type NotificationStatus = "queued" | "sent" | "failed";
+export type ReminderKind = "24h" | "1h";
 
 export interface Database {
   public: {
@@ -56,6 +57,7 @@ export interface Database {
           contact_phone: string | null;
           agreement_text: string | null;
           cancellation_cutoff_hours: number;
+          sms_monthly_cap: number;
           created_at: Ts;
           updated_at: Ts;
         },
@@ -333,6 +335,11 @@ export interface Database {
         },
         "appointment_id" | "firm_id" | "email" | "code_hash" | "expires_at"
       >;
+      appointment_reminders: Table<
+        { appointment_id: Uuid; kind: ReminderKind; starts_at: Ts; firm_id: Uuid; claimed_at: Ts },
+        "appointment_id" | "kind" | "starts_at" | "firm_id"
+      >;
+      sms_usage: Table<{ firm_id: Uuid; month: string; sent: number }, "firm_id" | "month">;
       audit_log: Table<
         {
           id: number;
@@ -370,6 +377,17 @@ export interface Database {
         Args: { p_appointment: Uuid; p_email: string; p_code_hash: string };
         Returns: "ok" | "wrong" | "expired" | "locked" | "missing";
       };
+      due_reminders: {
+        Args: Record<string, never>;
+        Returns: { appointment_id: Uuid; kind: ReminderKind; starts_at: Ts; firm_id: Uuid }[];
+      };
+      claim_due_reminders: {
+        Args: { p_limit?: number };
+        Returns: { appointment_id: Uuid; kind: ReminderKind; starts_at: Ts }[];
+      };
+      reserve_sms: { Args: { p_firm: Uuid }; Returns: boolean };
+      release_sms: { Args: { p_firm: Uuid; p_month: string }; Returns: undefined };
+      sms_month: { Args: Record<string, never>; Returns: string };
       search_conflict_parties: {
         Args: { p_query: string };
         Returns: { id: Uuid; name: string; matter: string; attorney_id: Uuid | null; similarity: number }[];

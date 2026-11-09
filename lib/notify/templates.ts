@@ -32,6 +32,8 @@ export interface TemplatePayloads {
   /** threadId isn't shown; it limits alerts to one per thread every few minutes. */
   message_received: { clientName: string; attorneyName: string; threadId: string };
   payment_unplaced: { clientName: string; amountCentavos: number; consultLabel: string; startsAt: string };
+  reminder_24h: BookingFacts & { clientName: string; cutoffHours: number };
+  reminder_1h: BookingFacts & { clientName: string };
   // To staff
   staff_new_booking: BookingFacts & { clientName: string; urgent: boolean; conflict: boolean; paid: boolean };
   staff_booking_canceled: BookingFacts & { clientName: string; refundDue: boolean };
@@ -40,6 +42,8 @@ export interface TemplatePayloads {
   staff_message_received: { clientName: string; threadId: string };
   staff_refund_due: { clientName: string; amountCentavos: number; reason: string; appointmentId: string | null };
   staff_invite: { inviterName: string; role: string; link: string; expiresAt: string };
+  /** month is "YYYY-MM-01". */
+  staff_sms_limit_reached: { cap: number; month: string };
   // To a visitor booking without signing in. Sent directly, never queued, because it holds a secret.
   booking_email_code: { code: string; minutes: number };
 }
@@ -186,6 +190,11 @@ function calendar(f: BookingFacts, ctx: RenderContext, canceled = false): string
   );
 }
 
+/** "today" or "tomorrow" in Manila time. Day-before reminders go out 20 to 24 hours ahead, so either can be right. */
+export function dayWord(startsAt: string, now = new Date()): "today" | "tomorrow" {
+  return manilaDate(new Date(startsAt)) === manilaDate(now) ? "today" : "tomorrow";
+}
+
 const hi = (name: string) => (name.trim() ? `Hi ${name.trim()},` : "Hello,");
 
 // ---------------------------------------------------------------------------
@@ -307,6 +316,35 @@ const builders: Builders = {
     action: { label: "See your account", href: `${ctx.siteUrl}/portal/appointments` },
   }),
 
+  reminder_24h: (p, ctx) => ({
+    audience: "client",
+    subject: `Reminder: ${p.consultLabel} ${dayWord(p.startsAt, ctx.now)} at ${formatTimeLabel(new Date(p.startsAt))}`,
+    heading: `Your consultation is ${dayWord(p.startsAt, ctx.now)}`,
+    greeting: hi(p.clientName),
+    paragraphs: [`This is a reminder of your consultation with ${ctx.firmName}.`],
+    details: bookingDetails(p),
+    action: { label: "View your appointment", href: `${ctx.siteUrl}/portal/appointments` },
+    after: [
+      `Need to change it? You can cancel or reschedule online up to ${p.cutoffHours} hour${p.cutoffHours === 1 ? "" : "s"} before the start. After that, reply to this email to reach the firm.`,
+    ],
+  }),
+
+  reminder_1h: (p, ctx) => ({
+    audience: "client",
+    subject: `Starting soon: ${p.consultLabel} at ${formatTimeLabel(new Date(p.startsAt))}`,
+    heading: "Your consultation starts in about an hour",
+    greeting: hi(p.clientName),
+    paragraphs: [
+      p.mode === "video"
+        ? "Use the meeting link below to join a few minutes early."
+        : p.mode === "phone"
+          ? "Keep your phone nearby. The attorney will call your mobile number."
+          : "Please arrive a few minutes early.",
+    ],
+    details: bookingDetails(p),
+    action: { label: "View your appointment", href: `${ctx.siteUrl}/portal/appointments` },
+  }),
+
   staff_new_booking: (p, ctx) => {
     const flags = [p.urgent ? "Urgent" : "", p.conflict ? "Possible conflict" : ""].filter(Boolean);
     return {
@@ -380,6 +418,20 @@ const builders: Builders = {
       `The link works once and expires on ${whenLabel(p.expiresAt)} (Philippine time). If you weren't expecting this, you can ignore it.`,
     ],
   }),
+
+  staff_sms_limit_reached: (p, ctx) => {
+    const month = new Date(`${p.month}T00:00:00+08:00`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "Asia/Manila" });
+    return {
+      audience: "staff",
+      subject: `${ctx.firmName} reached its text message limit for ${month}`,
+      heading: "Text reminders are paused this month",
+      paragraphs: [
+        `${ctx.firmName} has sent its ${p.cap} text messages for ${month}. Clients will keep getting email reminders, but no more texts until next month.`,
+        "To raise the limit, contact support.",
+      ],
+      action: { label: "Open firm settings", href: `${ctx.siteUrl}/staff/firm` },
+    };
+  },
 
   booking_email_code: (p, ctx) => ({
     audience: "client",

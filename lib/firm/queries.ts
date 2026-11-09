@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { redirect } from "next/navigation";
 import { getSessionAccount } from "@/lib/auth/session";
-import { formatCalendarDate, formatPeso } from "@/lib/booking/time";
+import { formatCalendarDate, formatPeso, manilaDate } from "@/lib/booking/time";
 import { publicEnv } from "@/lib/env";
 import { getStaffContext, type StaffContext } from "@/lib/staff/queries";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -201,4 +201,15 @@ export async function lookupInvite(token: string): Promise<InviteLookup> {
     hasAccount: Boolean(profile),
     signedInAsInvitee: Boolean(session && profile && session.id === profile.id),
   };
+}
+
+/** Texts the firm has sent this month (Philippine time) and its monthly limit. */
+export async function getSmsUsage(ctx: StaffContext): Promise<{ sent: number; cap: number }> {
+  const supabase = await createClient();
+  const month = `${manilaDate(new Date()).slice(0, 7)}-01`;
+  const [{ data: firm }, { data: usage }] = await Promise.all([
+    supabase.from("firms").select("sms_monthly_cap").eq("id", ctx.firmId).single(),
+    supabase.from("sms_usage").select("sent").eq("firm_id", ctx.firmId).eq("month", month).maybeSingle(),
+  ]);
+  return { sent: usage?.sent ?? 0, cap: firm?.sms_monthly_cap ?? 0 };
 }
