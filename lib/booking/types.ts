@@ -45,6 +45,15 @@ export interface AgreementState {
   signature: string;
 }
 
+export interface EmailCodeState {
+  /** The address the code went to. */
+  email: string;
+  code: string;
+  /** What happened last, e.g. "We emailed a code to …". */
+  info: string;
+  error: string | null;
+}
+
 export type SettingsTab = "profile" | "billing";
 
 export interface SettingsState {
@@ -84,6 +93,8 @@ export interface WizardState {
   agreement: AgreementState;
   agreementSigned: boolean;
   errors: ErrorState;
+  /** Set while a guest is asked for the code emailed to them. */
+  emailCode: EmailCodeState | null;
   /** A message from the server to show on the current step. */
   notice: string | null;
   pending: boolean;

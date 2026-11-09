@@ -11,8 +11,10 @@ import {
   holdSlot,
   loadSlots,
   removeUpload,
+  resendEmailCode,
   signAgreement,
   submitIntake as submitIntakeAction,
+  verifyEmailCode,
 } from "@/lib/booking/actions";
 import { createInitialWizardState } from "@/lib/booking/initial-state";
 import type { ConsultTypeOption, PublicAttorney, PublicFirm } from "@/lib/booking/public-types";
@@ -49,6 +51,10 @@ interface WizardContextValue {
   goToIntake: () => void;
   onIntakeChange: (patch: Partial<IntakeState>) => void;
   submitIntake: () => void;
+  onEmailCode: (code: string) => void;
+  submitEmailCode: () => void;
+  resendCode: () => void;
+  cancelEmailCode: () => void;
   uploadFiles: (files: FileList) => void;
   removeDocument: (id: string) => void;
   goToAgreement: () => void;
@@ -168,7 +174,13 @@ export function BookingWizardProvider({
     goToStep("intake");
   };
 
-  const onIntakeChange = (p: Partial<IntakeState>) => setState((s) => ({ ...s, intake: { ...s.intake, ...p } }));
+  const onIntakeChange = (p: Partial<IntakeState>) =>
+    setState((s) => ({
+      ...s,
+      intake: { ...s.intake, ...p },
+      // A code only confirms the address it was sent to.
+      emailCode: p.email !== undefined && p.email.trim().toLowerCase() !== s.emailCode?.email ? null : s.emailCode,
+    }));
 
   const submitIntake = async () => {
     const i = state.intake;
@@ -187,12 +199,57 @@ export function BookingWizardProvider({
     const result = await submitIntakeAction({ firmSlug: firm.slug, intake: i });
     if (!result.ok) {
       if (result.code === "expired") return restartFromTime(result.error);
+      if (result.code === "verify_email") {
+        const email = i.email.trim().toLowerCase();
+        return setState((s) => ({
+          ...s,
+          pending: false,
+          emailCode: { email, code: s.emailCode?.email === email ? s.emailCode.code : "", info: result.error, error: null },
+        }));
+      }
       const fieldErrors = Object.fromEntries((("fields" in result && result.fields) || []).map((f) => [f as ErrorKey, true]));
       return patch({ pending: false, errors: fieldErrors, notice: result.error });
     }
-    patch({ pending: false, intakeSaved: true });
+    patch({ pending: false, intakeSaved: true, emailCode: null });
     goToStep("documents");
   };
+
+  const patchEmailCode = (p: Partial<NonNullable<WizardState["emailCode"]>>) =>
+    setState((s) => (s.emailCode ? { ...s, emailCode: { ...s.emailCode, ...p } } : s));
+
+  const onEmailCode = (code: string) => patchEmailCode({ code: code.replace(/\D/g, "").slice(0, 6) });
+
+  /** Checks the code, then saves the intake it was holding back. */
+  const submitEmailCode = async () => {
+    const pendingCode = state.emailCode;
+    if (!pendingCode) return;
+    if (pendingCode.code.length !== 6) return patchEmailCode({ error: "Enter the 6-digit code from the email." });
+    patch({ pending: true, notice: null });
+    patchEmailCode({ error: null });
+    const result = await verifyEmailCode({ firmSlug: firm.slug, email: pendingCode.email, code: pendingCode.code });
+    if (!result.ok) {
+      if (result.code === "expired") return restartFromTime(result.error);
+      patch({ pending: false });
+      return patchEmailCode({ error: result.error });
+    }
+    await submitIntake();
+  };
+
+  const resendCode = async () => {
+    const pendingCode = state.emailCode;
+    if (!pendingCode) return;
+    patch({ pending: true, notice: null });
+    const result = await resendEmailCode({ firmSlug: firm.slug, email: pendingCode.email });
+    if (!result.ok && result.code === "expired") return restartFromTime(result.error);
+    patch({ pending: false });
+    patchEmailCode(
+      result.ok
+        ? { code: "", error: null, info: `We sent a new code to ${pendingCode.email}. Codes from earlier emails no longer work.` }
+        : { error: result.error },
+    );
+  };
+
+  const cancelEmailCode = () => patch({ emailCode: null, notice: null });
 
   const uploadFiles = async (files: FileList) => {
     patch({ pending: true, notice: null });
@@ -289,6 +346,10 @@ export function BookingWizardProvider({
     goToIntake: () => void goToIntake(),
     onIntakeChange,
     submitIntake: () => void submitIntake(),
+    onEmailCode,
+    submitEmailCode: () => void submitEmailCode(),
+    resendCode: () => void resendCode(),
+    cancelEmailCode,
     uploadFiles: (files) => void uploadFiles(files),
     removeDocument: (id) => void removeDocument(id),
     goToAgreement,

@@ -6,7 +6,7 @@ import { createServerClient } from "@supabase/ssr";
  * optimistic redirect for signed-out visitors. This is NOT the authorization layer:
  * pages check access with requireClient/requireStaff, and RLS enforces it in the DB.
  */
-const PUBLIC_PORTAL = ["/portal/login", "/portal/verify"];
+const PUBLIC_PORTAL = ["/portal/login", "/portal/verify", "/portal/email-changed"];
 const PUBLIC_STAFF = ["/staff/login"];
 
 export async function proxy(request: NextRequest) {

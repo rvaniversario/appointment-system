@@ -22,6 +22,7 @@ export function createInitialWizardState(prefill: { firstName?: string; lastName
     agreement: { agreed: false, signature: "" },
     agreementSigned: false,
     errors: {},
+    emailCode: null,
     notice: null,
     pending: false,
     cameraOk: false,

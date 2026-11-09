@@ -4,7 +4,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { sentEmails, to, waitForEmail } from "./mail.mjs";
+import { codeIn, sentEmails, to, waitForEmail, waitForNewEmail } from "./mail.mjs";
 
 const BASE = "http://localhost:3100";
 const FIRM = "harlow-reyes";
@@ -98,8 +98,26 @@ let bookedTime;
   await page.getByText("Enter a Philippine mobile number").waitFor();
   check("server rejects a non-PH mobile number", true);
   await field("Mobile number").fill("0917 123 4567");
+
+  // A guest confirms their email with a code before anything is saved.
+  const seen = (await sentEmails()).length;
   await page.getByRole("button", { name: "Continue →" }).click();
+  await page.getByText("We emailed a 6-digit code to juan.e2e@example.com").waitFor({ timeout: 10000 });
+  check("a guest is asked for an emailed code", path(page).endsWith("/intake"));
+  const codeEmail = await waitForNewEmail(seen, to("juan.e2e@example.com", /is your code to book with Harlow & Reyes/));
+  const code = codeIn(codeEmail);
+  check("the code is emailed from the firm", Boolean(code) && codeEmail.from === '"Harlow & Reyes" <notifications@e2e.test>', codeEmail?.from);
+  await page.fill("#email-code", code === "000000" ? "111111" : "000000");
+  await page.getByRole("button", { name: "Confirm and continue →" }).click();
+  await page.getByText("That code isn't right").waitFor();
+  check("a wrong code is refused", path(page).endsWith("/intake"));
+  await page.getByRole("button", { name: "Send a new code" }).click();
+  await page.getByText("We just sent a code. Please wait a minute").waitFor();
+  check("codes can't be resent straight away", true);
+  await page.fill("#email-code", code);
+  await page.getByRole("button", { name: "Confirm and continue →" }).click();
   await page.waitForURL("**/documents");
+  check("the right code saves the intake", path(page).endsWith("/documents"));
   check("no conflict warning is shown to the client", (await page.getByText(/conflict/i).count()) === 0);
 
   await page.locator('input[type="file"]').setInputFiles(pdf);

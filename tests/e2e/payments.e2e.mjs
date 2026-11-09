@@ -3,7 +3,7 @@
 import { createHmac } from "node:crypto";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
-import { sentEmails, to, waitForEmail } from "./mail.mjs";
+import { continueWithEmailCode, sentEmails, to, waitForEmail } from "./mail.mjs";
 
 const require = createRequire(import.meta.url);
 const { createClient } = require("@supabase/supabase-js");
@@ -76,7 +76,7 @@ async function toPayment(page, attorney, email, skip = 0) {
   await field("Briefly describe your situation").fill("A question.");
   await page.getByText("I understand this consultation").click();
   await page.getByText("I consent to Harlow & Reyes").click();
-  await page.getByRole("button", { name: "Continue →" }).click();
+  await continueWithEmailCode(page, email);
   await page.waitForURL("**/documents");
   await page.getByRole("button", { name: "Continue →" }).click();
   await page.getByText("I have read and agree").click();
@@ -126,7 +126,7 @@ const latestPayment = async (email) => {
   check("a paid booking is emailed a confirmation that mentions the payment", Boolean(confirmation?.text.includes("₱1,500")));
   const receipt = await waitForEmail(to("pay1@example.com", /^Receipt for ₱1,500/));
   check("and a receipt", Boolean(receipt));
-  const paidEmails = (await sentEmails()).filter((e) => e.to.includes("pay1@example.com"));
+  const paidEmails = (await sentEmails()).filter((e) => e.to.includes("pay1@example.com") && !/is your code/.test(e.subject));
   check("the duplicate webhook sends no second email", paidEmails.length === 2, String(paidEmails.length));
   check("no browser errors", errors.length === 0, errors.join(" | "));
   await ctx.close();

@@ -1,7 +1,7 @@
 "use client";
 
-import type { ErrorState, IntakeState, Urgency } from "@/lib/booking/types";
-import { errorTextStyle, fieldStyle, label, primaryButtonDisabled } from "@/lib/booking/ui";
+import type { EmailCodeState, ErrorState, IntakeState, Urgency } from "@/lib/booking/types";
+import { errorTextStyle, fieldStyle, label, linkButton, primaryButtonDisabled } from "@/lib/booking/ui";
 
 interface BookIntakeScreenProps {
   firmName: string;
@@ -10,8 +10,14 @@ interface BookIntakeScreenProps {
   errors: ErrorState;
   notice: string | null;
   pending: boolean;
+  /** Set when a guest must enter the code emailed to them before the intake is saved. */
+  emailCode: EmailCodeState | null;
   onIntakeChange: (patch: Partial<IntakeState>) => void;
   onSubmit: () => void;
+  onEmailCode: (code: string) => void;
+  onSubmitEmailCode: () => void;
+  onResendCode: () => void;
+  onCancelEmailCode: () => void;
 }
 
 const checkboxRow = {
@@ -35,8 +41,13 @@ export function BookIntakeScreen({
   errors,
   notice,
   pending,
+  emailCode,
   onIntakeChange,
   onSubmit,
+  onEmailCode,
+  onSubmitEmailCode,
+  onResendCode,
+  onCancelEmailCode,
 }: BookIntakeScreenProps) {
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "36px 32px 80px" }}>
@@ -214,10 +225,90 @@ export function BookIntakeScreen({
             Send me appointment reminders by text message (optional).
           </label>
 
-          <button disabled={pending} onClick={onSubmit} style={primaryButtonDisabled(pending)}>
-            {pending ? "Saving…" : "Continue →"}
-          </button>
+          {emailCode ? (
+            <EmailCodePanel
+              emailCode={emailCode}
+              pending={pending}
+              onCode={onEmailCode}
+              onSubmit={onSubmitEmailCode}
+              onResend={onResendCode}
+              onCancel={onCancelEmailCode}
+            />
+          ) : (
+            <button disabled={pending} onClick={onSubmit} style={primaryButtonDisabled(pending)}>
+              {pending ? "Saving…" : "Continue →"}
+            </button>
+          )}
       </div>
     </div>
+  );
+}
+
+function EmailCodePanel({
+  emailCode,
+  pending,
+  onCode,
+  onSubmit,
+  onResend,
+  onCancel,
+}: {
+  emailCode: EmailCodeState;
+  pending: boolean;
+  onCode: (code: string) => void;
+  onSubmit: () => void;
+  onResend: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        padding: "18px 20px",
+        border: "1px solid oklch(0.85 0.03 258)",
+        borderRadius: 10,
+        background: "oklch(0.97 0.01 258)",
+      }}
+    >
+      <div style={{ fontSize: 15, fontWeight: 600, color: "oklch(0.28 0.05 258)" }}>Confirm your email</div>
+      <div role="status" style={{ fontSize: 14, color: "oklch(0.4 0.01 258)" }}>
+        {emailCode.info}
+      </div>
+      <div>
+        <label htmlFor="email-code" style={label}>
+          6-digit code
+        </label>
+        <input
+          id="email-code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          value={emailCode.code}
+          onChange={(e) => onCode(e.target.value)}
+          style={{ ...fieldStyle(Boolean(emailCode.error)), maxWidth: 180, letterSpacing: 4, fontSize: 18 }}
+        />
+        {emailCode.error && (
+          <div role="alert" style={errorTextStyle}>
+            {emailCode.error}
+          </div>
+        )}
+      </div>
+      <button type="submit" disabled={pending} style={primaryButtonDisabled(pending)}>
+        {pending ? "Checking…" : "Confirm and continue →"}
+      </button>
+      <div style={{ display: "flex", gap: 18, fontSize: 13.5 }}>
+        <button type="button" disabled={pending} onClick={onResend} style={linkButton}>
+          Send a new code
+        </button>
+        <button type="button" disabled={pending} onClick={onCancel} style={linkButton}>
+          Use a different email
+        </button>
+      </div>
+    </form>
   );
 }

@@ -76,6 +76,37 @@ export async function updateProfile(input: ProfileInput): Promise<ActionResult> 
   return { ok: true };
 }
 
+const newEmailSchema = z.email("Enter a valid email address.").max(254, "That email address is too long.");
+
+/**
+ * Starts a client's sign-in email change. Supabase emails a link to both the current and the
+ * new address, and the email changes only after both are opened (/auth/confirm). Staff emails
+ * aren't changed here. An address that already has an account gets the same answer as any
+ * other, so this can't be used to find out who is a client; it just never receives a link.
+ */
+export async function requestEmailChange(email: string): Promise<ActionResult> {
+  const account = await getSessionAccount();
+  if (!account) return { ok: false, error: SIGNED_OUT_ERROR };
+  if (isStaffRole(account.role)) return { ok: false, error: "Staff sign-in emails can't be changed here. Ask your firm's admin." };
+
+  const parsed = newEmailSchema.safeParse(email.trim().toLowerCase());
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  if (parsed.data === account.email.toLowerCase()) return { ok: false, error: "That's already your email." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ email: parsed.data });
+  if (error && error.code !== "email_exists") {
+    if (error.status === 429 || error.code === "over_email_send_rate_limit") {
+      return { ok: false, error: "Too many attempts. Please wait a minute and try again." };
+    }
+    console.error("[profile] email change failed", { status: error.status, code: error.code, message: error.message });
+    return { ok: false, error: "We couldn't start the change right now. Please try again shortly." };
+  }
+
+  revalidatePath("/portal/settings");
+  return { ok: true };
+}
+
 /** Points the profile at a photo the browser just uploaded, then removes the previous one. */
 export async function setProfilePhoto(path: string): Promise<ActionResult> {
   const account = await getEditableAccount();
