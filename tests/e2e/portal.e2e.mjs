@@ -218,6 +218,65 @@ check("the client can opt in to SMS", profile.sms_opt_in === true);
 await page.getByRole("button", { name: "Billing & invoices" }).click();
 check("invoices show with the firm and amount", await page.getByText("Portal E2E Law ·").first().isVisible() && (await page.getByText("₱1,000").count()) === 1);
 
+// --- Changing the sign-in email: a link to each address, and both must be opened
+const NEW_EMAIL = "portal.new@client.test";
+/** The confirm link in the latest email-change message to an address, pointed at this server. */
+async function changeLink(address) {
+  for (let i = 0; i < 20; i++) {
+    const list = await (await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${address} subject:"Confirm your new sign-in email"`)}`)).json();
+    const id = list.messages?.[0]?.ID;
+    if (id) {
+      const html = (await (await fetch(`${MAILPIT}/api/v1/message/${id}`)).json()).HTML ?? "";
+      const href = html.match(/href="([^"]*\/auth\/confirm[^"]*)"/)?.[1];
+      if (href) {
+        const url = new URL(href.replaceAll("&amp;", "&"));
+        return `${BASE}${url.pathname}${url.search}`;
+      }
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return null;
+}
+async function requestChange(address) {
+  await page.goto(`${BASE}/portal/settings`);
+  await page.getByRole("button", { name: /Change email|Use a different new email/ }).click();
+  await page.fill("#new-email", address);
+  await page.getByRole("button", { name: "Send confirmation links" }).click();
+  await page.getByText(`To change your email to ${address}`).waitFor({ timeout: 10000 });
+}
+
+await fetch(`${MAILPIT}/api/v1/messages`, { method: "DELETE" });
+await requestChange("other@client.test");
+check("an address that has an account gets the same answer", true);
+await new Promise((r) => setTimeout(r, 1500));
+const toOther = await (await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent("to:other@client.test")}`)).json();
+check("an address that has an account is sent nothing", (toOther.messages ?? []).length === 0);
+
+// Supabase allows one email change request a minute per account.
+await new Promise((r) => setTimeout(r, 61_000));
+await requestChange(NEW_EMAIL);
+await page.reload();
+check("the pending change survives a reload", await page.getByText(`To change your email to ${NEW_EMAIL}`).isVisible());
+const newLink = await changeLink(NEW_EMAIL);
+const oldLink = await changeLink(EMAIL);
+check("both addresses get a confirmation link", Boolean(newLink && oldLink));
+const stillOld = await must(db.from("profiles").select("email").eq("id", client.id).single());
+check("the email doesn't change before the links are opened", stillOld.email === EMAIL, stillOld.email);
+
+const visitor = await browser.newContext();
+const visitorPage = await visitor.newPage();
+await visitorPage.goto(newLink);
+check("opening one link asks for the other", await visitorPage.getByText("One more link to open").isVisible(), visitorPage.url());
+const afterOne = await must(db.from("profiles").select("email").eq("id", client.id).single());
+check("one link alone changes nothing", afterOne.email === EMAIL, afterOne.email);
+await visitorPage.goto(oldLink);
+check("opening both links changes the email", await visitorPage.getByText("Your email has been changed").isVisible(), visitorPage.url());
+const changed = await must(db.from("profiles").select("email").eq("id", client.id).single());
+check("the profile now has the new email", changed.email === NEW_EMAIL, changed.email);
+await visitorPage.goto(oldLink);
+check("a used link says it didn't work", await visitorPage.getByText("That link didn't work").isVisible());
+await visitor.close();
+
 check("no browser errors", errors.length === 0, errors.join(" | "));
 await browser.close();
 console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");

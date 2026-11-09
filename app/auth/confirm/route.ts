@@ -20,6 +20,18 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   let ok = false;
 
+  // Email change links (one to each address). Until both are opened, Supabase accepts the
+  // first without starting a session, which is how the two steps are told apart.
+  if (tokenHash && type === "email_change") {
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    const status = error ? "failed" : data.session ? "done" : "partial";
+    if (error) console.error("[auth] email change link failed", { status: error.status, code: error.code });
+    const target = request.nextUrl.clone();
+    target.pathname = "/portal/email-changed";
+    target.search = `?status=${status}`;
+    return NextResponse.redirect(target);
+  }
+
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
     ok = !error;

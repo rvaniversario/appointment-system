@@ -40,6 +40,8 @@ export interface TemplatePayloads {
   staff_message_received: { clientName: string; threadId: string };
   staff_refund_due: { clientName: string; amountCentavos: number; reason: string; appointmentId: string | null };
   staff_invite: { inviterName: string; role: string; link: string; expiresAt: string };
+  // To a visitor booking without signing in. Sent directly, never queued, because it holds a secret.
+  booking_email_code: { code: string; minutes: number };
 }
 
 export type TemplateName = keyof TemplatePayloads;
@@ -106,6 +108,8 @@ interface Message {
   /** Replaces the standard footer. */
   footer?: string;
   ics?: string;
+  /** A one-time code, shown large under the paragraphs. */
+  code?: string;
 }
 
 function toEmail(m: Message, ctx: RenderContext): RenderedEmail {
@@ -133,6 +137,9 @@ function toEmail(m: Message, ctx: RenderContext): RenderedEmail {
     `<h1 style="font-size:20px;margin:0 0 18px;font-weight:600">${escapeHtml(m.heading)}</h1>`,
     m.greeting ? p(m.greeting) : "",
     ...m.paragraphs.map(p),
+    m.code
+      ? `<p style="margin:4px 0 18px;font-size:30px;font-weight:700;letter-spacing:8px;font-family:Menlo,Consolas,monospace">${escapeHtml(m.code)}</p>`
+      : "",
     detailRows ? `<table style="border-collapse:collapse;margin:4px 0 18px;font-size:14px">${detailRows}</table>` : "",
     m.action
       ? `<p style="margin:0 0 18px"><a href="${escapeHtml(m.action.href)}" style="display:inline-block;background:#1f2328;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:7px;font-weight:600">${escapeHtml(m.action.label)}</a></p>`
@@ -148,6 +155,7 @@ function toEmail(m: Message, ctx: RenderContext): RenderedEmail {
     "",
     ...(m.greeting ? [m.greeting, ""] : []),
     ...m.paragraphs.flatMap((t) => [t, ""]),
+    ...(m.code ? [m.code, ""] : []),
     ...(m.details?.length ? [...m.details.map(([label, value]) => `${label}: ${value}`), ""] : []),
     ...(m.action ? [`${m.action.label}: ${m.action.href}`, ""] : []),
     ...(m.after ?? []).flatMap((t) => [t, ""]),
@@ -371,6 +379,18 @@ const builders: Builders = {
     after: [
       `The link works once and expires on ${whenLabel(p.expiresAt)} (Philippine time). If you weren't expecting this, you can ignore it.`,
     ],
+  }),
+
+  booking_email_code: (p, ctx) => ({
+    audience: "client",
+    subject: `${p.code} is your code to book with ${ctx.firmName}`,
+    heading: "Confirm your email",
+    paragraphs: [`Enter this code on the booking page to confirm your email and continue booking with ${ctx.firmName}:`],
+    code: p.code,
+    after: [
+      `The code expires in ${p.minutes} minutes. If you didn't try to book a consultation, you can ignore this email. Nothing is booked without the code.`,
+    ],
+    footer: `Someone entered this address on ${ctx.firmName}'s booking page.`,
   }),
 };
 

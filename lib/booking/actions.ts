@@ -1,16 +1,16 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionAccount } from "@/lib/auth/session";
 import { normalizeMobile } from "@/lib/profile/mobile";
 import { publicEnv } from "@/lib/env";
-import { paymentsConfigured } from "@/lib/env.server";
+import { emailConfigured, paymentsConfigured } from "@/lib/env.server";
 import { createCheckoutSession, expireCheckoutSession, PaymongoError } from "@/lib/payments/paymongo";
 import { CHECKOUT_MINUTES } from "@/lib/payments/settle";
-import { notifyBookingConfirmed } from "@/lib/notify/events";
+import { notifyBookingConfirmed, sendBookingEmailCode } from "@/lib/notify/events";
 import { ALLOWED_DOCUMENT_TYPES, DOCUMENTS_BUCKET, MAX_DOCUMENT_BYTES, safeFileName } from "@/lib/documents/rules";
 import { buildAgreement } from "./agreement";
 import {
@@ -33,7 +33,7 @@ import { isDateString, manilaDate } from "./time";
  * and every action after the hold proves ownership with the booking cookie.
  */
 
-type Failure = { ok: false; error: string; code?: "taken" | "expired" | "unavailable" };
+type Failure = { ok: false; error: string; code?: "taken" | "expired" | "unavailable" | "verify_email" };
 const fail = (error: string, code?: Failure["code"]): Failure => ({ ok: false, error, code });
 
 const EXPIRED = "Your reserved time has expired. Please choose a time again.";
@@ -217,6 +217,128 @@ async function findOrCreateClient(email: string): Promise<string | null> {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Guest email codes
+// ---------------------------------------------------------------------------
+
+const CODE_MINUTES = 10;
+const RESEND_SECONDS = 60;
+const MAX_CODE_SENDS = 5;
+const MAX_CODE_ATTEMPTS = 5;
+
+const codeHash = (appointmentId: string, code: string) => createHash("sha256").update(`${appointmentId}:${code}`).digest("hex");
+const codeSchema = z.string().trim().regex(/^\d{6}$/);
+
+/**
+ * Guests prove they own the email they typed before it's tied to an account. Without Resend
+ * configured, development skips the check; production refuses to book instead.
+ */
+function emailCheckMode(): "on" | "skip" | "unavailable" {
+  if (emailConfigured()) return "on";
+  return process.env.NODE_ENV === "production" ? "unavailable" : "skip";
+}
+
+async function emailVerified(appointmentId: string, email: string): Promise<boolean> {
+  const { data } = await createAdminClient()
+    .from("booking_email_codes")
+    .select("verified_at")
+    .eq("appointment_id", appointmentId)
+    .eq("email", email)
+    .maybeSingle();
+  return Boolean(data?.verified_at);
+}
+
+/**
+ * Emails a new code, unless `reuse` is set and a usable code for this address is already out.
+ * Limited to one send a minute and a few per booking.
+ */
+async function issueEmailCode(firmId: string, appointmentId: string, email: string, reuse: boolean): Promise<{ ok: true } | Failure> {
+  const admin = createAdminClient();
+  const { data: row } = await admin.from("booking_email_codes").select("*").eq("appointment_id", appointmentId).maybeSingle();
+  const now = Date.now();
+  if (row) {
+    const usable = row.email === email && !row.verified_at && new Date(row.expires_at).getTime() > now && row.attempts < MAX_CODE_ATTEMPTS;
+    if (reuse && usable) return { ok: true };
+    if (now - new Date(row.last_sent_at).getTime() < RESEND_SECONDS * 1000) {
+      return fail("We just sent a code. Please wait a minute before asking for another.");
+    }
+    if (row.sends >= MAX_CODE_SENDS) return fail("Too many codes were sent for this booking. Please contact the firm to book.");
+  }
+
+  const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const send = (row?.sends ?? 0) + 1;
+  const { error } = await admin.from("booking_email_codes").upsert(
+    {
+      appointment_id: appointmentId,
+      firm_id: firmId,
+      email,
+      code_hash: codeHash(appointmentId, code),
+      expires_at: new Date(now + CODE_MINUTES * 60_000).toISOString(),
+      attempts: 0,
+      sends: send,
+      last_sent_at: new Date(now).toISOString(),
+      verified_at: null,
+    },
+    { onConflict: "appointment_id" },
+  );
+  if (error) {
+    console.error("[booking] email code not saved", { code: error.code, message: error.message });
+    return fail(GENERIC);
+  }
+
+  const { sent } = await sendBookingEmailCode({ firmId, appointmentId, to: email, code, minutes: CODE_MINUTES, send });
+  if (!sent) return fail("We couldn't email a code to that address. Please check it and try again.");
+  return { ok: true };
+}
+
+const verifyEmailNotice = (email: string) => `We emailed a 6-digit code to ${email}. Enter it below to continue.`;
+
+/** Sends a fresh code to the address on the intake form. */
+export async function resendEmailCode(input: { firmSlug: string; email: string }): Promise<{ ok: true } | Failure> {
+  const live = await liveBooking(input.firmSlug);
+  if (!live) return fail(EXPIRED, "expired");
+  const email = z.email().max(254).safeParse(input.email?.trim().toLowerCase());
+  if (!email.success) return fail("Enter a valid email address.");
+  if (emailCheckMode() !== "on") return fail(GENERIC);
+  return issueEmailCode(live.firmId, live.booking.id, email.data, false);
+}
+
+/** Checks the code the guest typed. On success the intake can be saved. */
+export async function verifyEmailCode(input: { firmSlug: string; email: string; code: string }): Promise<{ ok: true } | Failure> {
+  const live = await liveBooking(input.firmSlug);
+  if (!live) return fail(EXPIRED, "expired");
+  const email = z.email().max(254).safeParse(input.email?.trim().toLowerCase());
+  const code = codeSchema.safeParse(input.code ?? "");
+  if (!email.success || !code.success) return fail("Enter the 6-digit code from the email.");
+
+  const { data: status, error } = await createAdminClient().rpc("verify_booking_email_code", {
+    p_appointment: live.booking.id,
+    p_email: email.data,
+    p_code_hash: codeHash(live.booking.id, code.data),
+  });
+  if (error) {
+    console.error("[booking] email code check failed", { code: error.code, message: error.message });
+    return fail(GENERIC);
+  }
+  switch (status) {
+    case "ok":
+      await extendHold(live.booking.id);
+      return { ok: true };
+    case "wrong":
+      return fail("That code isn't right. Use the code from the most recent email.");
+    case "expired":
+      return fail("That code has expired. Send a new one.");
+    case "locked":
+      return fail("Too many wrong codes. Send a new one.");
+    default:
+      return fail("Send a code to this address first.");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Intake
+// ---------------------------------------------------------------------------
+
 export async function submitIntake(input: { firmSlug: string; intake: IntakeInput }): Promise<IntakeResult> {
   const live = await liveBooking(input.firmSlug);
   if (!live) return fail(EXPIRED, "expired");
@@ -231,8 +353,19 @@ export async function submitIntake(input: { firmSlug: string; intake: IntakeInpu
   const intake = parsed.data;
   const admin = createAdminClient();
 
-  // Signed-in clients book as themselves; guests are matched to an account by email.
+  // Signed-in clients book as themselves. Guests confirm their email with a code first, and
+  // only then is the booking matched to (or creates) the account for that email.
   const session = await getSessionAccount();
+  if (!session) {
+    const mode = emailCheckMode();
+    if (mode === "unavailable") return fail("Online booking is unavailable right now. Please contact the firm.", "unavailable");
+    if (mode === "on" && !(await emailVerified(live.booking.id, intake.email))) {
+      const issued = await issueEmailCode(live.firmId, live.booking.id, intake.email, true);
+      if (!issued.ok) return { ...issued, fields: ["email"] };
+      await extendHold(live.booking.id);
+      return fail(verifyEmailNotice(intake.email), "verify_email");
+    }
+  }
   const clientId = session?.id ?? (await findOrCreateClient(intake.email));
   if (!clientId) return fail(GENERIC);
 

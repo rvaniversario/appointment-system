@@ -147,12 +147,19 @@ decides who hears about what:
 | Message | "You have a new message" | "New client message", at most once per thread every 15 minutes |
 | Refund due (cancel, decline, late payment) | Told a refund is coming | Partners and admins |
 | Staff invite | | The invitee gets the link |
+| Guest books without signing in | A 6-digit code to confirm the email, before the intake is saved | |
 
 Emails are queued in `notification_log` (one row per email, de-duplicated by `dedupe_key`)
 and sent right after the response. Failures are retried after 1, 5, 30, 120 and 360 minutes by
 `/api/cron/send-notifications`, which pg_cron calls every five minutes through pg_net. Emails
-not sent within 24 hours are marked failed instead of going out late. Invite emails are sent
-directly, because only the link's hash is stored.
+not sent within 24 hours are marked failed instead of going out late. Invite emails and guest
+booking codes are sent directly, because they hold secrets that are only stored as hashes.
+
+Without `RESEND_API_KEY`, `next dev` skips the guest email code so local booking still works.
+A production build refuses guest bookings instead, since it can't confirm the address.
+
+Supabase Auth's own emails (portal sign-in codes and email change links) go through Resend's
+SMTP on hosted projects (see Deploying). Locally they land in Mailpit.
 
 ## Deploying (Vercel + Supabase)
 
@@ -163,13 +170,26 @@ directly, because only the link's hash is stored.
    - **URL Configuration**: Site URL = your domain.
    - **Providers → Email**: confirm email ON. Set the OTP length to 6 and the OTP expiry
      to 600s.
-   - **Email Templates → Magic Link**: paste the body of `supabase/templates/magic_link.html`.
-     It includes `{{ .Token }}`, without which the email has no code.
+   - **Email Templates → Magic Link**: subject "Your sign-in code"; paste the body of
+     `supabase/templates/magic_link.html`. It includes `{{ .Token }}`, without which the email
+     has no code.
+   - **Email Templates → Change Email Address**: subject "Confirm your new sign-in email"; paste
+     the body of `supabase/templates/email_change.html`. Its link goes to `/auth/confirm` with
+     `type=email_change`.
+   - **Providers → Email**: keep **Secure email change** ON, so both the old and the new
+     address must confirm. It only takes effect with "Confirm email" ON (above); with it off, one
+     link is enough.
    - **URL Configuration → Redirect URLs**: add `https://<your-domain>/auth/confirm` (and
      `http://localhost:3000/auth/confirm` on the dev project).
    - **Multi-Factor**: TOTP enabled.
    - **Passwords**: minimum length 12, with lowercase, uppercase and digits required.
-   - **SMTP**: Resend. The default Supabase mailer is rate-limited and not for production.
+   - **SMTP Settings**: enable custom SMTP with host `smtp.resend.com`, port `465`, username
+     `resend`, password = a Resend API key (a separate key with sending access only is best),
+     sender email = `EMAIL_FROM`, sender name = the product name. The default Supabase mailer
+     only sends to team members and is not for production.
+   - **Rate Limits**: with custom SMTP, raise "emails sent per hour" from its default of 30 to
+     fit sign-in and email-change traffic across all firms (guest booking codes don't count;
+     they go through the Resend API).
    In the SQL editor, give the email worker the site's address and the cron secret (once per
    project). Until both exist, the scheduled job does nothing:
    ```sql
@@ -199,7 +219,7 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
   - [x] 5c: Firm settings, staff invites, attorney management
 - [ ] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm, in three PRs:
   - [x] 6a: Email notifications for bookings, payments, messages and staff invites, with a retrying queue
-  - [ ] 6b: Supabase Auth email through Resend, an emailed code for guest bookings, email change in the portal
+  - [x] 6b: Supabase Auth email through Resend, an emailed code for guest bookings, email change in the portal
   - [ ] 6c: SMS through PhilSMS, 24-hour and 1-hour reminders, per-firm SMS cap
 - [ ] Phase 7: Firm self-service signup + platform admin
 - [ ] Phase 8: Subscriptions (PayMongo recurring billing, plan limits, lapsed-firm handling)

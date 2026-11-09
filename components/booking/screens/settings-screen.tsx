@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { PasswordInput } from "@/components/booking/password-input";
 import type { AccountSettings } from "@/components/account/use-account-settings";
 import type { SettingsTab } from "@/lib/booking/types";
@@ -24,6 +24,8 @@ interface SettingsScreenProps {
   showPasswordFields: boolean;
   /** Clients choose whether to get booking texts. */
   showSmsOptIn?: boolean;
+  /** Controls for changing the sign-in email, shown under it. Without them the email is read-only. */
+  emailChange?: ReactNode;
   settingsTab: SettingsTab;
   availableTabs: { key: SettingsTab; label: string }[];
   portalInvoiceItems: PortalInvoice[];
@@ -35,6 +37,7 @@ export function SettingsScreen({
   account,
   showPasswordFields,
   showSmsOptIn = false,
+  emailChange,
   settingsTab,
   availableTabs,
   portalInvoiceItems,
@@ -248,8 +251,12 @@ export function SettingsScreen({
                     aria-describedby="settings-email-note"
                     style={{ ...settingsFieldStyle, background: "oklch(0.96 0.003 90)", color: "oklch(0.5 0.01 258)" }}
                   />
-                  <div id="settings-email-note" style={{ fontSize: 12.5, color: "oklch(0.5 0.01 258)", marginTop: 6 }}>
-                    Your email can&apos;t be changed here yet.
+                  <div id="settings-email-note">
+                    {emailChange ?? (
+                      <div style={{ fontSize: 12.5, color: "oklch(0.5 0.01 258)", marginTop: 6 }}>
+                        Your email can&apos;t be changed here.
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>

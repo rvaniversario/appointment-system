@@ -318,6 +318,21 @@ export interface Database {
         },
         "firm_id" | "channel" | "template" | "recipient"
       >;
+      booking_email_codes: Table<
+        {
+          appointment_id: Uuid;
+          firm_id: Uuid;
+          email: string;
+          code_hash: string;
+          expires_at: Ts;
+          attempts: number;
+          sends: number;
+          last_sent_at: Ts;
+          verified_at: Ts | null;
+          created_at: Ts;
+        },
+        "appointment_id" | "firm_id" | "email" | "code_hash" | "expires_at"
+      >;
       audit_log: Table<
         {
           id: number;
@@ -350,6 +365,10 @@ export interface Database {
       claim_notifications: {
         Args: { p_limit?: number };
         Returns: Database["public"]["Tables"]["notification_log"]["Row"][];
+      };
+      verify_booking_email_code: {
+        Args: { p_appointment: Uuid; p_email: string; p_code_hash: string };
+        Returns: "ok" | "wrong" | "expired" | "locked" | "missing";
       };
       search_conflict_parties: {
         Args: { p_query: string };

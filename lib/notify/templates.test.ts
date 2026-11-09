@@ -88,4 +88,13 @@ describe("renderEmail", () => {
     expect(email.text).toContain("Accept the invite: https://app.example/staff/invite/tok");
     expect(email.text).toContain("invited this address");
   });
+
+  it("shows a guest's booking code on its own line", () => {
+    const email = renderEmail("booking_email_code", { code: "042917", minutes: 10 }, ctx);
+    expect(email.subject).toBe("042917 is your code to book with Harlow & Reyes");
+    expect(email.text).toMatch(/^042917$/m);
+    expect(email.html).toContain(">042917</p>");
+    expect(email.text).toContain("expires in 10 minutes");
+    expect(email.text).toContain("Someone entered this address on Harlow & Reyes's booking page.");
+  });
 });

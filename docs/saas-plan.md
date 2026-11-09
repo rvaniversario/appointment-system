@@ -80,7 +80,7 @@ The riskiest phase. Nothing else ships on the old security model.
 - Carried forward from this phase:
   - Paid consultations stop at the payment step with a notice until Phase 4.
   - Guest bookings link to an account by the email typed, without proving the visitor owns it.
-    Phase 6 adds an emailed code before a guest booking is confirmed.
+    Phase 6 adds an emailed code before a guest booking is confirmed. (Done in 6b.)
   - Anyone can place 15-minute holds; Phase 9's rate limits and Turnstile cover abuse.
   - Attorney photos still show a placeholder until firm settings (Phase 5) can upload them.
   - The product name in `lib/brand.ts` is a placeholder.
@@ -152,7 +152,7 @@ Decisions:
   - Staff can't read or answer portal messages yet (5b). The portal checks for replies every
     30 seconds; email alerts come in Phase 6.
   - Changing the sign-in email waits for Phase 6, which sets up reliable email for the
-    confirmation messages.
+    confirmation messages. (Done in 6b.)
   - No invoice is ever "due" yet: invoices are only created when an online payment succeeds. A
     "Pay now" button arrives with staff-issued invoices.
   - The cancellation cutoff is fixed at 24 hours until firm settings (5c) can change it.
@@ -220,7 +220,7 @@ It ships as three PRs, each branched off master:
 | PR | Scope |
 | --- | --- |
 | 6a: email notifications (done) | Resend sender, retrying send queue, booking, payment, message and review emails, staff alerts, invite emails |
-| 6b: account email | Supabase Auth SMTP through Resend, an emailed code before a guest booking is confirmed, email change in the portal |
+| 6b: account email (done) | Supabase Auth SMTP through Resend, an emailed code before a guest booking is confirmed, email change in the portal |
 | 6c: SMS and reminders | PhilSMS sender, 24-hour and 1-hour reminders by email and SMS, per-firm monthly SMS cap |
 
 Decisions:
@@ -249,12 +249,40 @@ Decisions:
 - Invite emails are sent directly and logged without the link, because only its hash is
   stored. If sending fails, the admin still sees the link to copy.
 - Carried forward from 6a:
-  - Supabase Auth emails (sign-in codes) still use Supabase's mailer until 6b.
+  - Supabase Auth emails (sign-in codes) still use Supabase's mailer until 6b. (Done in 6b.)
   - Delivery events after sending (bounces, complaints) aren't recorded; a Resend webhook can
     add that later.
   - Emails are English only, and there are no per-person email preferences. They're all
     about a booking or account the person has.
   - Tested against a local mock of Resend. Check one real send with the live API key.
+
+6b details:
+- **Guest email code**: a visitor who isn't signed in gets a 6-digit code at the intake step,
+  sent from the firm through the Resend API. Nothing is saved, and no account is found or
+  created, until the code is entered. Signed-in clients skip it.
+  - Our own code, not Supabase's OTP: it doesn't sign the guest in, it carries the firm's name,
+    and it stays off Supabase's project-wide hourly auth email limit.
+  - `booking_email_codes` holds one hashed code per booking (service role only). Codes last
+    10 minutes; five wrong guesses lock a code; a new one can be sent once a minute, up to five
+    per booking. `verify_booking_email_code()` counts each guess in one statement.
+  - A code confirms one address: changing the email on the form asks for a new code.
+  - Without Resend configured, development skips the check and production refuses guest
+    bookings.
+- **Email change** in portal settings uses Supabase's secure email change: a link goes to both
+  addresses (`email_change.html`), and the email changes only after both are opened.
+  `/auth/confirm` sends each link to `/portal/email-changed`, which says whether the other
+  link is still needed. The existing trigger copies the new address to `profiles`. Supabase
+  only requires both links when "Confirm email" is on, so local config now turns it on too,
+  matching hosted.
+  - An address that already has an account gets the same answer as any other and simply
+    receives nothing, so the form can't reveal who is a client.
+  - Staff can't change their email in the portal.
+- **Auth SMTP**: hosted projects send sign-in codes and email change links through Resend's
+  SMTP, configured in the dashboard (README, Deploying). Locally they stay in Mailpit.
+- Carried forward from 6b:
+  - A guest who switches attorney mid-booking starts a new booking and confirms the code again.
+  - Past bookings and intakes keep the email they were made with; only the account changes.
+  - Staff sign-in emails can only be changed by an operator in the Supabase dashboard.
 
 ## Phase 7: Firm signup and platform admin
 - Self-service signup: account, mandatory MFA, firm name and slug, first attorney, go live.

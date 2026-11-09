@@ -486,3 +486,59 @@ export async function sendInviteEmail(input: {
     return { sent: false };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Guest email codes
+// ---------------------------------------------------------------------------
+
+/**
+ * Emails a guest the code that confirms their address. Sent directly, like invites, and
+ * logged without the code. `send` numbers the codes for one booking, so each is its own
+ * Resend idempotency key.
+ */
+export async function sendBookingEmailCode(input: {
+  firmId: string;
+  appointmentId: string;
+  to: string;
+  code: string;
+  minutes: number;
+  send: number;
+}): Promise<{ sent: boolean }> {
+  if (!emailConfigured()) return { sent: false };
+  const admin = createAdminClient();
+  const { data: firm } = await admin.from("firms").select("name, contact_email").eq("id", input.firmId).maybeSingle();
+  if (!firm) return { sent: false };
+
+  const email = renderEmail(
+    "booking_email_code",
+    { code: input.code, minutes: input.minutes },
+    { firmName: firm.name, siteUrl: publicEnv.NEXT_PUBLIC_SITE_URL, fromAddress: emailEnv().EMAIL_FROM },
+  );
+  const log = {
+    firm_id: input.firmId,
+    channel: "email" as const,
+    template: "booking_email_code",
+    recipient: input.to,
+    appointment_id: input.appointmentId,
+    dedupe_key: `booking_email_code:${input.appointmentId}:${input.send}`,
+    attempts: 1,
+  };
+  try {
+    const { id } = await sendEmail({
+      fromName: firm.name,
+      to: input.to,
+      replyTo: firm.contact_email,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+      idempotencyKey: `booking-code-${input.appointmentId}-${input.send}`,
+    });
+    await admin.from("notification_log").insert({ ...log, status: "sent", provider_message_id: id, sent_at: new Date().toISOString() });
+    return { sent: true };
+  } catch (error) {
+    const message = error instanceof ResendError ? `${error.status} ${error.message}` : String(error);
+    console.error("[notify] booking code email failed", { message });
+    await admin.from("notification_log").insert({ ...log, status: "failed", error: message.slice(0, 500) });
+    return { sent: false };
+  }
+}
