@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # End-to-end browser tests against a production build and the LOCAL Supabase stack.
 #
-#   tests/e2e/run.sh [all|booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications]
+#   tests/e2e/run.sh [all|booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders]
 #
 # Needs Docker with `npx supabase start` running, and Playwright's browser installed once:
 #   npx playwright install chromium
 #
 # It RESETS THE LOCAL DATABASE (never the hosted one), adds test firms and accounts, links the
-# sample firm to a mock PayMongo server on :4010, sends email to a mock Resend server on :4020,
+# sample firm to a mock PayMongo server on :4010, sends email to a mock Resend server on :4020
+# and texts to a mock PhilSMS server on :4030,
 # builds the app and serves it on :3100.
 # Set SKIP_BUILD=1 to reuse the last build.
 set -u
@@ -27,9 +28,10 @@ export NEXT_PUBLIC_SITE_URL=http://localhost:3100
 export PAYMONGO_SECRET_KEY=sk_test_mock PAYMONGO_API_BASE=http://localhost:4010
 export CRON_SECRET=cron-secret-for-local-testing-only-0123456789
 export RESEND_API_KEY=re_mock RESEND_API_BASE=http://localhost:4020 EMAIL_FROM=notifications@e2e.test
+export PHILSMS_API_TOKEN=philsms-mock-token PHILSMS_SENDER_ID=E2ELaw PHILSMS_API_BASE=http://localhost:4030/api/v3
 
 stop() {
-  for port in 3100 4010 4020; do
+  for port in 3100 4010 4020 4030; do
     if command -v taskkill > /dev/null; then
       for p in $(netstat -ano | grep ":$port " | grep LISTENING | awk '{print $5}' | sort -u); do taskkill //PID "$p" //F > /dev/null 2>&1; done
     else
@@ -53,6 +55,7 @@ docker exec -i supabase_db_online-appointment-system psql -q -U postgres -d post
 
 node "$E2E/mock-paymongo.mjs" > "${TMPDIR:-/tmp}/e2e-mock.log" 2>&1 &
 node "$E2E/mock-resend.mjs" > "${TMPDIR:-/tmp}/e2e-mock-resend.log" 2>&1 &
+node "$E2E/mock-philsms.mjs" > "${TMPDIR:-/tmp}/e2e-mock-philsms.log" 2>&1 &
 sleep 1
 
 pw() { sed -n 's/.*share securely): //p'; }
@@ -78,8 +81,8 @@ run() { echo "=== $1"; node "$E2E/$1.e2e.mjs" || RC=1; }
 # The booking suite books David Okafor's first open time; run it before payments, which
 # expects the sample firm's other attorneys to still have open times.
 case "$SUITE" in
-  all) run booking; run payments; run staff-auth; run portal; run staff-dashboard; run firm-settings; run notifications ;;
-  booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications) run "$SUITE" ;;
+  all) run booking; run payments; run staff-auth; run portal; run staff-dashboard; run firm-settings; run notifications; run reminders ;;
+  booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders) run "$SUITE" ;;
   *) echo "Unknown suite: $SUITE"; exit 2 ;;
 esac
 

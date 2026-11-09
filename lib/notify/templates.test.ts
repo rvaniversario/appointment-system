@@ -98,3 +98,25 @@ describe("renderEmail", () => {
     expect(email.text).toContain("Someone entered this address on Harlow & Reyes's booking page.");
   });
 });
+
+describe("reminder emails", () => {
+  it("reminds a day ahead with the change policy", () => {
+    const email = renderEmail("reminder_24h", { ...facts, clientName: "Juan", cutoffHours: 24 }, ctx);
+    expect(email.subject).toBe("Reminder: Initial Consultation tomorrow at 9:00 AM");
+    expect(email.text).toContain("Meeting link: https://meet.example/abc");
+    expect(email.text).toContain("up to 24 hours before the start");
+    expect(email.ics).toBeUndefined();
+  });
+
+  it("tells a phone client to keep their phone nearby an hour ahead", () => {
+    const email = renderEmail("reminder_1h", { ...facts, mode: "phone", where: null, clientName: "Juan" }, ctx);
+    expect(email.subject).toBe("Starting soon: Initial Consultation at 9:00 AM");
+    expect(email.text).toContain("Keep your phone nearby");
+  });
+
+  it("tells managers when texts stop for the month", () => {
+    const email = renderEmail("staff_sms_limit_reached", { cap: 200, month: "2026-11-01" }, ctx);
+    expect(email.subject).toBe("Harlow & Reyes reached its text message limit for November 2026");
+    expect(email.text).toContain("keep getting email reminders");
+  });
+});

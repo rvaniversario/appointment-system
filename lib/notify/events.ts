@@ -2,7 +2,7 @@ import "server-only";
 import { emailConfigured, emailEnv } from "@/lib/env.server";
 import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { enqueueEmails, keyPart, sendSoon, type QueuedEmail } from "./queue";
+import { enqueue, keyPart, sendSoon, type QueuedEmail, type QueuedNotification } from "./queue";
 import { ResendError, sendEmail } from "./resend";
 import { renderEmail, type BookingFacts } from "./templates";
 
@@ -104,10 +104,10 @@ async function staffFor(admin: Admin, b: Pick<Booking, "firmId" | "attorneyProfi
   return [...new Set([...attorney, ...extra])];
 }
 
-async function run(label: string, work: (admin: Admin) => Promise<QueuedEmail[]>) {
+async function run(label: string, work: (admin: Admin) => Promise<QueuedNotification[]>) {
   try {
     const items = await work(createAdminClient());
-    await enqueueEmails(items);
+    await enqueue(items);
     if (items.length) sendSoon();
   } catch (error) {
     console.error(`[notify] ${label} failed`, { message: (error as Error).message });
@@ -541,4 +541,86 @@ export async function sendBookingEmailCode(input: {
     await admin.from("notification_log").insert({ ...log, status: "failed", error: message.slice(0, 500) });
     return { sent: false };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Reminders and text limits
+// ---------------------------------------------------------------------------
+
+/**
+ * Queues the reminders that just came due: an email to the client, and a text if they agreed
+ * to texts on this booking. The scheduled worker calls this before sending. Each reminder is
+ * claimed once in the database, so it's never queued twice. Returns how many were claimed.
+ */
+export async function queueDueReminders(limit = 50): Promise<number> {
+  try {
+    const admin = createAdminClient();
+    const { data: due, error } = await admin.rpc("claim_due_reminders", { p_limit: limit });
+    if (error) {
+      console.error("[notify] reminder claim failed", { code: error.code, message: error.message });
+      return 0;
+    }
+    const items: QueuedNotification[] = [];
+    for (const r of due ?? []) {
+      const b = await loadBooking(admin, r.appointment_id);
+      if (!b?.client) continue;
+      const stamp = new Date(r.starts_at).getTime();
+      const { data: intake } = await admin.from("intakes").select("first_name, phone, sms_opt_in").eq("appointment_id", r.appointment_id).maybeSingle();
+      const clientName = intake?.first_name ?? b.client.name;
+
+      items.push(
+        r.kind === "24h"
+          ? {
+              firmId: b.firmId,
+              template: "reminder_24h",
+              recipient: b.client.email,
+              appointmentId: r.appointment_id,
+              dedupeKey: `reminder_24h:${r.appointment_id}:${stamp}`,
+              payload: { ...b.facts, clientName, cutoffHours: b.cutoffHours },
+            }
+          : {
+              firmId: b.firmId,
+              template: "reminder_1h",
+              recipient: b.client.email,
+              appointmentId: r.appointment_id,
+              dedupeKey: `reminder_1h:${r.appointment_id}:${stamp}`,
+              payload: { ...b.facts, clientName },
+            },
+      );
+
+      // Texts only with consent given on this booking, to the number given on it.
+      const phone = intake?.sms_opt_in ? intake.phone : null;
+      if (phone && /^639\d{9}$/.test(phone)) {
+        items.push({
+          channel: "sms",
+          firmId: b.firmId,
+          template: r.kind === "24h" ? "sms_reminder_24h" : "sms_reminder_1h",
+          recipient: phone,
+          appointmentId: r.appointment_id,
+          dedupeKey: `sms_reminder_${r.kind}:${r.appointment_id}:${stamp}`,
+          payload: b.facts,
+        });
+      }
+    }
+    await enqueue(items);
+    return due?.length ?? 0;
+  } catch (error) {
+    console.error("[notify] reminders failed", { message: (error as Error).message });
+    return 0;
+  }
+}
+
+/** Tells a firm's partners and admins, once a month, that its texts stopped at the cap. */
+export function notifySmsLimitReached(firmId: string, cap: number, month: string) {
+  return run("text limit", async (admin) =>
+    (await managerEmails(admin, firmId)).map(
+      (to): QueuedEmail => ({
+        firmId,
+        template: "staff_sms_limit_reached",
+        recipient: to,
+        dedupeKey: `staff_sms_limit_reached:${firmId}:${month}:${to}`,
+        payload: { cap, month },
+      }),
+    ),
+  );
 }

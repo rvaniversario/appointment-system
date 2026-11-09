@@ -68,6 +68,8 @@ with a mock PayMongo server on 4010 and a mock Resend server on 4020. It needs D
 | `CRON_SECRET` | **server only** | Bearer token for the `/api/cron/*` jobs (32+ characters) |
 | `RESEND_API_KEY` | **server only** | Resend API key (`re_…`). Without it, no notification emails are queued or sent |
 | `EMAIL_FROM` | **server only** | Sending address on our verified domain, e.g. `notifications@mail.example.com` |
+| `PHILSMS_API_TOKEN` | **server only** | PhilSMS API token. Without it (or the sender ID), no texts are sent; reminders still go by email |
+| `PHILSMS_SENDER_ID` | **server only** | Our sender name approved by PhilSMS (up to 11 letters or digits) |
 
 `lib/env.ts` validates these at startup. Server secrets live in `lib/env.server.ts`, which
 is guarded by `server-only` so they can never be bundled into client code.
@@ -148,6 +150,7 @@ decides who hears about what:
 | Refund due (cancel, decline, late payment) | Told a refund is coming | Partners and admins |
 | Staff invite | | The invitee gets the link |
 | Guest books without signing in | A 6-digit code to confirm the email, before the intake is saved | |
+| A day and an hour before a booking | A reminder email, plus a text if they agreed to texts | Partners and admins, once a month, if the firm hits its text limit |
 
 Emails are queued in `notification_log` (one row per email, de-duplicated by `dedupe_key`)
 and sent right after the response. Failures are retried after 1, 5, 30, 120 and 360 minutes by
@@ -160,6 +163,27 @@ A production build refuses guest bookings instead, since it can't confirm the ad
 
 Supabase Auth's own emails (portal sign-in codes and email change links) go through Resend's
 SMTP on hosted projects (see Deploying). Locally they land in Mailpit.
+
+### Reminders and texts (PhilSMS)
+
+Confirmed bookings get two reminders: one 20 to 24 hours before the start (for bookings made
+more than a day ahead) and one 10 to 60 minutes before (for bookings made at least two hours
+ahead). Each goes by email, and also by text when the client ticked "Send me appointment
+reminders by text message" on that booking's intake. The worker claims due reminders in
+`appointment_reminders`, once per booking, kind and start time, so a rescheduled booking is
+reminded of its new time only, and a reminder whose booking was canceled or moved before it
+went out is skipped.
+
+Texts go out through PhilSMS under our one approved sender ID, with the firm's name at the
+start of the message. Like emails they hold only who, when and how (never case details or
+the meeting link) and are queued and retried in `notification_log` (channel `sms`). PhilSMS
+has no idempotency key, so only failures where nothing was sent are retried.
+
+Each firm may send `firms.sms_monthly_cap` texts per calendar month in Philippine time
+(default 200), counted in `sms_usage`. Over the cap, texts are skipped (emails still go) and
+the firm's partners and admins get one email that month. Partners and admins see the count
+under **Staff → Firm**. Until plans arrive in Phase 8, an operator changes a firm's cap in SQL:
+`update firms set sms_monthly_cap = 500 where slug = '<firm>';`.
 
 ## Deploying (Vercel + Supabase)
 
@@ -197,6 +221,11 @@ SMTP on hosted projects (see Deploying). Locally they land in Mailpit.
    select vault.create_secret('<CRON_SECRET>', 'cron_secret');
    ```
    In Resend, verify the sending domain (SPF, DKIM, DMARC) before setting `EMAIL_FROM`.
+   Use the PhilSMS platform at dashboard.philsms.com (accounts, credit and API tokens on the
+   retired app.philsms.com don't carry over). Have the sender ID approved before setting
+   `PHILSMS_SENDER_ID`, and keep the account's credit topped up: a firm's cap limits what it
+   can send, not our balance. The cap counts texts, while PhilSMS bills per 160-character part,
+   and a day-before reminder is usually two parts.
 4. In Vercel, import the repo and set the env vars above for Preview (staging project) and
    Production (production project). Use a PayMongo test key on Preview and the live key only on
    Production.
@@ -217,10 +246,10 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
   - [x] 5a: Client portal on real data (appointments with reschedule/cancel, messages, documents, invoices)
   - [x] 5b: Staff dashboard on real data (calendar, intake queue, conflicts, analytics, availability, messages)
   - [x] 5c: Firm settings, staff invites, attorney management
-- [ ] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm, in three PRs:
+- [x] Phase 6: Email (Resend) + SMS (PhilSMS) notifications and reminders, with SMS metered per firm, in three PRs:
   - [x] 6a: Email notifications for bookings, payments, messages and staff invites, with a retrying queue
   - [x] 6b: Supabase Auth email through Resend, an emailed code for guest bookings, email change in the portal
-  - [ ] 6c: SMS through PhilSMS, 24-hour and 1-hour reminders, per-firm SMS cap
+  - [x] 6c: SMS through PhilSMS, 24-hour and 1-hour reminders, per-firm SMS cap
 - [ ] Phase 7: Firm self-service signup + platform admin
 - [ ] Phase 8: Subscriptions (PayMongo recurring billing, plan limits, lapsed-firm handling)
 - [ ] Phase 9: Hardening and launch (CSP, rate limits, error pages, SEO, E2E tests, legal documents)
