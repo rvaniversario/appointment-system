@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { chromium } from "playwright";
+import { to, waitForEmail } from "./mail.mjs";
 
 const BASE = "http://localhost:3100";
 const MAILPIT = "http://127.0.0.1:54324";
@@ -148,6 +149,9 @@ check("inside the cutoff, there is no cancel button", (await soonCard.getByRole(
   check("reschedule keeps the length", new Date(moved.ends_at) - new Date(moved.starts_at) === 30 * 60_000);
   const audits = await must(db.from("audit_log").select("action").eq("entity_id", movable.id));
   check("reschedule is audited", audits.some((a) => a.action === "appointment.rescheduled_by_client"));
+  const moveEmail = await waitForEmail(to(EMAIL, /^Rescheduled: /));
+  check("the client is emailed the new time with an updated calendar file", Boolean(moveEmail?.attachments[0]?.content.includes("METHOD:PUBLISH")));
+  check("the attorney is told the client rescheduled", Boolean(await waitForEmail(to("atty@portal.test", /^Rescheduled by client: Rosa Reyes/))));
 }
 
 {
@@ -161,6 +165,10 @@ check("inside the cutoff, there is no cancel button", (await soonCard.getByRole(
   const payment = await must(db.from("payments").select("status").eq("appointment_id", paid.id).single());
   check("the payment stays paid, for the firm to refund", payment.status === "paid");
   check("canceled booking shows as canceled", (await page.getByTestId("portal-appointment").filter({ hasText: "Canceled" }).count()) === 1);
+  const cancelEmail = await waitForEmail(to(EMAIL, /^Canceled: /));
+  check("the client is emailed a cancellation that mentions the refund", Boolean(cancelEmail?.text.includes("will refund the fee")));
+  check("with a calendar cancellation", Boolean(cancelEmail?.attachments[0]?.content.includes("METHOD:CANCEL")));
+  check("the attorney is told the client canceled", Boolean(await waitForEmail(to("atty@portal.test", /^Canceled by client: Rosa Reyes/))));
 }
 const soonRow = await must(db.from("appointments").select("status").eq("id", soon.id).single());
 check("the booking inside the cutoff is untouched", soonRow.status === "confirmed");
@@ -175,6 +183,9 @@ await page.waitForFunction(() => document.querySelector("textarea")?.value === "
 await page.locator("div", { hasText: /^Will do, thank you.$/ }).first().waitFor({ timeout: 10000 });
 const sent = await must(db.from("messages").select("sender_id").eq("thread_id", thread.id).eq("body", "Will do, thank you."));
 check("the message is saved as the client's", sent.length === 1 && sent[0].sender_id === client.id);
+const messageAlert = await waitForEmail(to("atty@portal.test", /^New message from Rosa Reyes/));
+check("the attorney is emailed about the message", Boolean(messageAlert));
+check("the alert doesn't include the message", Boolean(messageAlert && !messageAlert.text.includes("Will do")));
 let readAt = null;
 for (let i = 0; i < 10 && !readAt; i++) {
   readAt = (await must(db.from("messages").select("read_at").eq("id", attorneyMessage.id).single())).read_at;

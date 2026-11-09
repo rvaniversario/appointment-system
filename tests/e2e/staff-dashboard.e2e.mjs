@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { chromium } from "playwright";
+import { sentEmails, to, waitForEmail } from "./mail.mjs";
 
 const BASE = "http://localhost:3100";
 const PASSWORD = "Staff-Pass-123456";
@@ -192,6 +193,8 @@ const row = (table, id, columns) => must(db.from(table).select(columns).eq("id",
   await page.getByRole("button", { name: "Save link" }).click();
   const linked = await eventually(() => row("appointments", conflicted.id, "meeting_url"), (r) => r.meeting_url === "https://zoom.us/j/123");
   check("the meeting link is saved", linked.meeting_url === "https://zoom.us/j/123");
+  const linkEmail = await waitForEmail(to("client@dash.test", /^Meeting link for your consultation/));
+  check("the client is emailed the new meeting link", Boolean(linkEmail?.text.includes("https://zoom.us/j/123")));
 
   const pdf = join(tmpdir(), "retainer.pdf");
   writeFileSync(pdf, "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
@@ -207,6 +210,7 @@ const row = (table, id, columns) => must(db.from(table).select(columns).eq("id",
   check("approving marks the booking approved", approved.review_status === "approved");
   const audits = await must(db.from("audit_log").select("action, actor_id").eq("entity_id", conflicted.id));
   check("approval is audited with the attorney as actor", audits.some((a) => a.action === "appointment.approved" && a.actor_id === one.id));
+  check("the client is told the attorney accepted", Boolean(await waitForEmail(to("client@dash.test", /^Olivia One accepted your consultation/))));
 
   await page.goto(`${BASE}/staff/appointments/${past.id}`);
   await page.getByRole("button", { name: "Completed" }).click();
@@ -224,6 +228,8 @@ const row = (table, id, columns) => must(db.from(table).select(columns).eq("id",
   check("the reply is saved as the attorney's", reply.length === 1 && reply[0].sender_id === one.id);
   const read = await eventually(() => row("messages", clientMessage.id, "read_at"), (r) => Boolean(r.read_at));
   check("opening the conversation marks the client's message read", Boolean(read.read_at));
+  const replyAlert = await waitForEmail(to("client@dash.test", /^New message from Olivia One/));
+  check("the client is emailed about the reply, without its text", Boolean(replyAlert && !replyAlert.text.includes("that's fine")));
 
   await page.goto(`${BASE}/staff/availability`);
   const saturday = page.getByTestId("hours-Saturday");
@@ -266,6 +272,9 @@ const row = (table, id, columns) => must(db.from(table).select(columns).eq("id",
   const moved = await eventually(() => row("appointments", toReassign.id, "attorney_id, review_status, meeting_url"), (r) => r.attorney_id === attTwo.id);
   check("a partner reassigns a booking", moved.attorney_id === attTwo.id && moved.review_status === "approved", JSON.stringify(moved));
   check("the video link follows the new attorney", moved.meeting_url === "https://meet.example/two", moved.meeting_url);
+  const movedEmail = await waitForEmail(to("client@dash.test", /^Your consultation is now with Tomas Two/));
+  check("the client is emailed the new attorney and link", Boolean(movedEmail?.text.includes("https://meet.example/two")));
+  check("the new attorney is told", Boolean(await waitForEmail(to("two@dash.test", /^Assigned to you: Carla/))));
 
   await page.goto(`${BASE}/staff/appointments/${toDecline.id}`);
   await page.getByRole("button", { name: "Decline", exact: true }).click();
@@ -274,6 +283,10 @@ const row = (table, id, columns) => must(db.from(table).select(columns).eq("id",
   await page.getByRole("button", { name: "Decline booking" }).click();
   const declined = await eventually(() => row("appointments", toDecline.id, "status, review_status, cancel_reason"), (r) => r.status === "canceled");
   check("declining cancels the booking", declined.review_status === "declined" && declined.cancel_reason === "declined by firm", JSON.stringify(declined));
+  const declineEmail = await waitForEmail((e) => e.to.includes("client@dash.test") && /^Canceled: /.test(e.subject));
+  check("the client is told the firm can't take it, and about the refund", Boolean(declineEmail?.text.includes("isn't able to take it") && declineEmail.text.includes("will refund")));
+  check("the decline reason stays internal", (await sentEmails()).every((e) => !e.text.includes("Outside our practice")));
+  check("partners are told a refund is due", Boolean(await waitForEmail(to("partner@dash.test", /^Refund due: ₱1,000 to Carla/))));
   await page.goto(`${BASE}/staff/billing`);
   check("billing shows the declined fee as a refund due", await page.getByText("Paid, declined by firm — refund due").isVisible());
   check("billing shows fees by attorney", await page.getByText("Online fees by attorney").isVisible());

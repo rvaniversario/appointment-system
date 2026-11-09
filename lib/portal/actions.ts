@@ -7,6 +7,7 @@ import { getSessionAccount, type SessionAccount } from "@/lib/auth/session";
 import { bookingWindow, getAvailability, getSlotPage, releaseLapsedHolds, type SlotPageData } from "@/lib/booking/queries";
 import { isDateString, manilaDate } from "@/lib/booking/time";
 import { ALLOWED_DOCUMENT_TYPES, DOCUMENTS_BUCKET, MAX_DOCUMENT_BYTES, safeFileName } from "@/lib/documents/rules";
+import { notifyCanceled, notifyMessage, notifyRescheduled } from "@/lib/notify/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -84,6 +85,7 @@ export async function cancelAppointment(input: { appointmentId: string }): Promi
   await audit(account, appointment.firm_id, "appointment.canceled_by_client", "appointments", appointment.id, {
     starts_at: appointment.starts_at,
   });
+  await notifyCanceled(appointment.id, "client");
   revalidatePath("/portal/appointments");
   return { ok: true };
 }
@@ -155,6 +157,7 @@ export async function rescheduleAppointment(input: { appointmentId: string; star
     from: appointment.starts_at,
     to: startsAt.toISOString(),
   });
+  await notifyRescheduled(appointment.id, appointment.starts_at);
   revalidatePath("/portal/appointments");
   return { ok: true };
 }
@@ -204,11 +207,12 @@ export async function sendMessage(input: { attorneyId: string; body: string }): 
     threadId = created.id;
   }
 
-  const { error } = await supabase.from("messages").insert({ thread_id: threadId, sender_id: account.id, body });
-  if (error) {
-    console.error("[portal] message insert failed", { code: error.code, message: error.message });
+  const { data: sent, error } = await supabase.from("messages").insert({ thread_id: threadId, sender_id: account.id, body }).select("id").single();
+  if (error || !sent) {
+    console.error("[portal] message insert failed", { code: error?.code, message: error?.message });
     return fail("Your message wasn't sent. Please try again.");
   }
+  await notifyMessage(sent.id);
   revalidatePath("/portal/messages");
   return { ok: true };
 }

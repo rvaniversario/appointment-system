@@ -3,6 +3,7 @@
 import { createHmac } from "node:crypto";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
+import { sentEmails, to, waitForEmail } from "./mail.mjs";
 
 const require = createRequire(import.meta.url);
 const { createClient } = require("@supabase/supabase-js");
@@ -121,6 +122,12 @@ const latestPayment = async (email) => {
   check("a duplicate webhook is ignored", dup.status === 200 && dup.body?.duplicate === true, JSON.stringify(dup.body));
   const { count: invoices2 } = await db.from("invoices").select("id", { count: "exact", head: true }).eq("appointment_id", r.appointmentId);
   check("no second invoice from the duplicate", invoices2 === 1, String(invoices2));
+  const confirmation = await waitForEmail(to("pay1@example.com", /^Booked: /));
+  check("a paid booking is emailed a confirmation that mentions the payment", Boolean(confirmation?.text.includes("₱1,500")));
+  const receipt = await waitForEmail(to("pay1@example.com", /^Receipt for ₱1,500/));
+  check("and a receipt", Boolean(receipt));
+  const paidEmails = (await sentEmails()).filter((e) => e.to.includes("pay1@example.com"));
+  check("the duplicate webhook sends no second email", paidEmails.length === 2, String(paidEmails.length));
   check("no browser errors", errors.length === 0, errors.join(" | "));
   await ctx.close();
 }
@@ -204,6 +211,10 @@ let releasedPaymentId;
   check("the late booking stays canceled", after.appointmentStatus === "canceled" && after.payments[0].status === "paid");
   const { count: overlaps } = await db.from("appointments").select("id", { count: "exact", head: true }).eq("attorney_id", appt.attorney_id).eq("starts_at", appt.starts_at).eq("status", "confirmed");
   check("the attorney is not double-booked", overlaps === 1, String(overlaps));
+  const unplaced = await waitForEmail(to("pay4@example.com", /^About your payment/));
+  check("the client is told a refund is coming", Boolean(unplaced?.text.includes("will refund the full amount")));
+  const refundAlert = await waitForEmail(to("partner@harlow.test", /^Refund due: ₱1,500 to Paying Client/));
+  check("the firm's partners are told a refund is due", Boolean(refundAlert));
   await ctx.close();
 }
 

@@ -311,6 +311,10 @@ export interface Database {
           attempts: number;
           created_at: Ts;
           sent_at: Ts | null;
+          dedupe_key: string;
+          payload: Json;
+          next_attempt_at: Ts;
+          locked_until: Ts | null;
         },
         "firm_id" | "channel" | "template" | "recipient"
       >;
@@ -342,6 +346,10 @@ export interface Database {
       update_own_attorney_profile: {
         Args: { p_bio: string; p_practice_areas: string[]; p_languages: string[]; p_meeting_url: string | null };
         Returns: undefined;
+      };
+      claim_notifications: {
+        Args: { p_limit?: number };
+        Returns: Database["public"]["Tables"]["notification_log"]["Row"][];
       };
       search_conflict_parties: {
         Args: { p_query: string };

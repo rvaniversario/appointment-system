@@ -4,6 +4,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
+import { sentEmails, to, waitForEmail } from "./mail.mjs";
 
 const BASE = "http://localhost:3100";
 const FIRM = "harlow-reyes";
@@ -122,6 +123,19 @@ let bookedTime;
   check("calendar file downloads", ics.ok() && body.includes("BEGIN:VEVENT") && body.includes("Maria Chen"), String(ics.status()));
   check("no browser errors during booking", errors.length === 0, errors.join(" | "));
   await ctx.close();
+
+  // Emails: the client gets a confirmation with a calendar file; the firm is alerted.
+  const confirmation = await waitForEmail(to("juan.e2e@example.com", /^Booked: /));
+  check("client is emailed a confirmation", Boolean(confirmation));
+  check("confirmation comes from the firm, on our domain", confirmation?.from === '"Harlow & Reyes" <notifications@e2e.test>', confirmation?.from);
+  const attachment = confirmation?.attachments.find((a) => a.filename === "consultation.ics");
+  check("confirmation has a calendar file", Boolean(attachment?.content.includes("BEGIN:VEVENT") && attachment.content.includes("Maria Chen")));
+  check("confirmation has the time and a portal link", Boolean(confirmation?.text.includes(bookedTime) && confirmation.text.includes("/portal/appointments")));
+  const alert = await waitForEmail(to("partner@harlow.test", /New booking: Juan Dela Cruz/));
+  check("an unlinked attorney's booking alerts the firm's partners", Boolean(alert));
+  check("the alert flags a possible conflict", Boolean(alert?.subject.includes("Possible conflict")), alert?.subject);
+  const all = await sentEmails();
+  check("no email carries case details", all.every((e) => !e.text.includes("Custody question") && !e.text.includes("Amara Smyth")));
 }
 
 // --- Double booking: a second visitor can't take the same time

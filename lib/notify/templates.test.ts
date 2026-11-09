@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest";
+import { renderEmail, whenLabel, type BookingFacts } from "./templates";
+
+const ctx = {
+  firmName: "Harlow & Reyes",
+  siteUrl: "https://app.example",
+  fromAddress: "notifications@mail.example.com",
+  now: new Date("2026-11-09T00:00:00Z"),
+};
+
+const facts: BookingFacts = {
+  appointmentId: "3a000000-0000-4000-8000-000000000001",
+  consultLabel: "Initial Consultation",
+  attorneyName: "Atty. Maria Reyes",
+  startsAt: "2026-11-20T01:00:00Z",
+  endsAt: "2026-11-20T01:30:00Z",
+  mode: "video",
+  where: "https://meet.example/abc",
+};
+
+describe("whenLabel", () => {
+  it("shows Manila time", () => {
+    expect(whenLabel("2026-11-20T01:00:00Z")).toBe("Fri, Nov 20, 2026 at 9:00 AM");
+  });
+});
+
+describe("renderEmail", () => {
+  it("renders a confirmation with details, a portal link and a calendar file", () => {
+    const email = renderEmail("booking_confirmed", { ...facts, clientName: "Juan", priceCentavos: 150000, cutoffHours: 24 }, ctx);
+    expect(email.subject).toBe("Booked: Initial Consultation with Atty. Maria Reyes, Fri, Nov 20, 2026 at 9:00 AM");
+    expect(email.text).toContain("Hi Juan,");
+    expect(email.text).toContain("₱1,500");
+    expect(email.text).toContain("Meeting link: https://meet.example/abc");
+    expect(email.text).toContain("https://app.example/portal/appointments");
+    expect(email.text).toContain("up to 24 hours before");
+    expect(email.ics).toContain("METHOD:PUBLISH");
+    expect(email.ics).toContain("URL:https://meet.example/abc");
+  });
+
+  it("escapes HTML from names and firm data", () => {
+    const email = renderEmail("message_received", { clientName: "<b>Juan</b>", attorneyName: "Atty. <script>", threadId: "t" }, ctx);
+    expect(email.html).not.toContain("<b>Juan</b>");
+    expect(email.html).not.toContain("<script>");
+    expect(email.html).toContain("&lt;b&gt;Juan&lt;/b&gt;");
+    expect(email.html).toContain("Harlow &amp; Reyes");
+  });
+
+  it("asks staff to sign in to read a message", () => {
+    const email = renderEmail("staff_message_received", { clientName: "Juan dela Cruz", threadId: "t" }, ctx);
+    expect(email.text).toContain("Sign in to read and reply");
+    expect(email.text).toContain("https://app.example/staff/messages");
+  });
+
+  it("flags urgent and conflicting bookings for staff", () => {
+    const email = renderEmail(
+      "staff_new_booking",
+      { ...facts, clientName: "Juan dela Cruz", urgent: true, conflict: true, paid: false },
+      ctx,
+    );
+    expect(email.subject.startsWith("[Urgent, Possible conflict] New booking: Juan dela Cruz")).toBe(true);
+    expect(email.text).toContain(`https://app.example/staff/appointments/${facts.appointmentId}`);
+    expect(email.ics).toBeUndefined();
+  });
+
+  it("tells a client a declined paid booking will be refunded, with a cancellation file", () => {
+    const email = renderEmail("booking_canceled", { ...facts, clientName: "Juan", by: "firm", refundDue: true }, ctx);
+    expect(email.text).toContain("isn't able to take it");
+    expect(email.text).toContain("will refund the fee");
+    expect(email.ics).toContain("METHOD:CANCEL");
+  });
+
+  it("describes phone and in-person consultations", () => {
+    const phone = renderEmail("booking_approved", { ...facts, mode: "phone", where: null, clientName: "" }, ctx);
+    expect(phone.text).toContain("Hello,");
+    expect(phone.text).toContain("How: The attorney will call your mobile number");
+    const office = renderEmail("booking_approved", { ...facts, mode: "in_person", where: "Makati Office, 1 Ayala Ave", clientName: "Juan" }, ctx);
+    expect(office.text).toContain("Where: Makati Office, 1 Ayala Ave");
+  });
+
+  it("puts the link in an invite, with its own footer", () => {
+    const email = renderEmail(
+      "staff_invite",
+      { inviterName: "Pat Partner", role: "admin", link: "https://app.example/staff/invite/tok", expiresAt: "2026-11-16T00:00:00Z" },
+      ctx,
+    );
+    expect(email.subject).toBe("Pat Partner invited you to Harlow & Reyes");
+    expect(email.text).toContain("as an admin");
+    expect(email.text).toContain("Accept the invite: https://app.example/staff/invite/tok");
+    expect(email.text).toContain("invited this address");
+  });
+});

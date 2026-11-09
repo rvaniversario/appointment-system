@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { addDays, isDateString } from "@/lib/booking/time";
 import { ALLOWED_DOCUMENT_TYPES, DOCUMENTS_BUCKET, MAX_DOCUMENT_BYTES, safeFileName } from "@/lib/documents/rules";
+import { notifyApproved, notifyCanceled, notifyMeetingLink, notifyMessage, notifyReassigned } from "@/lib/notify/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -66,6 +67,7 @@ export async function approveAppointment(input: { appointmentId: string }): Prom
     .maybeSingle();
   if (!data) return fail(GENERIC);
   await audit(ctx, "appointment.approved", "appointments", appt.id);
+  if (appt.review_status !== "approved") await notifyApproved(appt.id);
   refresh(appt.id);
   return { ok: true };
 }
@@ -87,6 +89,7 @@ export async function declineAppointment(input: { appointmentId: string; reason:
     .maybeSingle();
   if (!data) return fail(GENERIC);
   await audit(ctx, "appointment.declined", "appointments", appt.id, { reason });
+  await notifyCanceled(appt.id, "firm");
   refresh(appt.id);
   return { ok: true };
 }
@@ -124,6 +127,7 @@ export async function reassignAppointment(input: { appointmentId: string; attorn
     return fail(GENERIC);
   }
   await audit(ctx, "appointment.reassigned", "appointments", appt.id, { from: appt.attorney_id, to: target.id });
+  await notifyReassigned(appt.id, appt.attorney_id);
   refresh(appt.id);
   return { ok: true };
 }
@@ -149,6 +153,7 @@ export async function setMeetingUrl(input: { appointmentId: string; url: string 
     .maybeSingle();
   if (!data) return fail(GENERIC);
   await audit(ctx, "appointment.meeting_link_set", "appointments", appt.id, { cleared: !parsed.data });
+  if (parsed.data && parsed.data !== appt.meeting_url && appt.status === "confirmed") await notifyMeetingLink(appt.id);
   refresh(appt.id);
   return { ok: true };
 }
@@ -201,13 +206,16 @@ export async function sendStaffMessage(input: { threadId: string; body: string }
   if (!parsed.success) return fail(input.body?.trim() ? "Messages can be up to 5,000 characters." : "Type a message first.");
 
   // RLS allows the thread's attorney and the firm's partners and admins.
-  const { error } = await (await createClient())
+  const { data: sent, error } = await (await createClient())
     .from("messages")
-    .insert({ thread_id: parsed.data.threadId, sender_id: ctx.account.id, body: parsed.data.body });
-  if (error) {
-    console.error("[staff] message insert failed", { code: error.code, message: error.message });
+    .insert({ thread_id: parsed.data.threadId, sender_id: ctx.account.id, body: parsed.data.body })
+    .select("id")
+    .single();
+  if (error || !sent) {
+    console.error("[staff] message insert failed", { code: error?.code, message: error?.message });
     return fail("Your message wasn't sent. Please try again.");
   }
+  await notifyMessage(sent.id);
   revalidatePath("/staff/messages");
   return { ok: true };
 }

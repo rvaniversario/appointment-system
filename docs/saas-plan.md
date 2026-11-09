@@ -215,6 +215,47 @@ As in the original plan, plus:
 - SMS uses our PhilSMS account and is **metered per firm**, because each message costs us money.
   Keep SMS free of case details, as already planned.
 
+It ships as three PRs, each branched off master:
+
+| PR | Scope |
+| --- | --- |
+| 6a: email notifications (done) | Resend sender, retrying send queue, booking, payment, message and review emails, staff alerts, invite emails |
+| 6b: account email | Supabase Auth SMTP through Resend, an emailed code before a guest booking is confirmed, email change in the portal |
+| 6c: SMS and reminders | PhilSMS sender, 24-hour and 1-hour reminders by email and SMS, per-firm monthly SMS cap |
+
+Decisions:
+- **Scheduling**: pg_cron calls `/api/cron/send-notifications` every five minutes through pg_net,
+  with the site address and `CRON_SECRET` read from Supabase Vault. Vercel Hobby crons run only
+  daily, and this works the same on the later VPS. Templates stay in the Next app rather than a
+  Deno Edge Function.
+- **SMS cap until Phase 8**: sends are counted per firm per month and SMS stops (email still
+  goes) at a default cap that an operator can change per firm. Phase 8 replaces the default with
+  the plan's allowance.
+
+6a details:
+- `notification_log` is both the queue and the record. Each email is a row with a `dedupe_key`,
+  so the webhook and reconciliation confirming the same booking queue one confirmation.
+  `claim_notifications()` hands rows to one worker at a time (`for update skip locked`).
+- Emails are sent right after the response (`after()`). Provider failures (429, 5xx, network)
+  are retried after 1, 5, 30, 120 and 360 minutes; other errors fail at once. Anything not sent
+  within 24 hours is failed rather than sent late. Resend gets the row id as its idempotency key.
+- Emails carry booking facts only. Message alerts never include the message, the decline reason
+  stays internal, and conflict matches are only flagged to staff.
+- Staff alerts go to the booking's attorney. Partners and admins also get urgent or conflict-
+  flagged bookings, bookings for attorneys with no linked account, and every refund due.
+- Message alerts go out at most once per thread per recipient every 15 minutes.
+- Confirmations, reschedules, reassignments and new meeting links attach an `.ics` file with
+  one UID per booking; cancellations attach a cancellation.
+- Invite emails are sent directly and logged without the link, because only its hash is
+  stored. If sending fails, the admin still sees the link to copy.
+- Carried forward from 6a:
+  - Supabase Auth emails (sign-in codes) still use Supabase's mailer until 6b.
+  - Delivery events after sending (bounces, complaints) aren't recorded; a Resend webhook can
+    add that later.
+  - Emails are English only, and there are no per-person email preferences. They're all
+    about a booking or account the person has.
+  - Tested against a local mock of Resend. Check one real send with the live API key.
+
 ## Phase 7: Firm signup and platform admin
 - Self-service signup: account, mandatory MFA, firm name and slug, first attorney, go live.
 - IBP roll number check before a firm's page is published. Manual review in our admin area is
