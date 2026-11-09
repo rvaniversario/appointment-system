@@ -221,8 +221,11 @@ under **Staff → Firm**. Until plans arrive in Phase 8, an operator changes a f
    select vault.create_secret('<CRON_SECRET>', 'cron_secret');
    ```
    In Resend, verify the sending domain (SPF, DKIM, DMARC) before setting `EMAIL_FROM`.
-   In PhilSMS, have the sender ID approved before setting `PHILSMS_SENDER_ID`, and keep the
-   account's credit topped up: a firm's cap limits what it can send, not our balance.
+   Use the PhilSMS platform at dashboard.philsms.com (accounts, credit and API tokens on the
+   retired app.philsms.com don't carry over). Have the sender ID approved before setting
+   `PHILSMS_SENDER_ID`, and keep the account's credit topped up: a firm's cap limits what it
+   can send, not our balance. The cap counts texts, while PhilSMS bills per 160-character part,
+   and a day-before reminder is usually two parts.
 4. In Vercel, import the repo and set the env vars above for Preview (staging project) and
    Production (production project). Use a PayMongo test key on Preview and the live key only on
    Production.

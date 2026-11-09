@@ -74,8 +74,8 @@ const smsSchema = z.object({
   PHILSMS_API_TOKEN: z.string().min(10),
   /** The sender name PhilSMS approved for us: up to 11 letters and digits, or a number. */
   PHILSMS_SENDER_ID: z.string().regex(/^([A-Za-z0-9 ]{1,11}|\d{10,15})$/, "must be an approved PhilSMS sender ID (up to 11 letters or digits)"),
-  /** Overridable so tests can point at a local mock. */
-  PHILSMS_API_BASE: z.url().default("https://app.philsms.com/api/v3"),
+  /** The current PhilSMS platform (the old app.philsms.com is retired). Overridable so tests can point at a local mock. */
+  PHILSMS_API_BASE: z.url().default("https://dashboard.philsms.com/api/v3"),
 });
 
 let cachedSms: z.infer<typeof smsSchema> | null = null;
