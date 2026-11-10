@@ -58,6 +58,8 @@ export interface Database {
           agreement_text: string | null;
           cancellation_cutoff_hours: number;
           sms_monthly_cap: number;
+          created_by: Uuid | null;
+          review_requested_at: Ts | null;
           created_at: Ts;
           updated_at: Ts;
         },
@@ -340,6 +342,10 @@ export interface Database {
         "appointment_id" | "kind" | "starts_at" | "firm_id"
       >;
       sms_usage: Table<{ firm_id: Uuid; month: string; sent: number }, "firm_id" | "month">;
+      signup_email_codes: Table<
+        { email: string; code_hash: string; expires_at: Ts; attempts: number; sends: number; last_sent_at: Ts; verified_at: Ts | null; created_at: Ts },
+        "email" | "code_hash" | "expires_at"
+      >;
       audit_log: Table<
         {
           id: number;
@@ -388,6 +394,28 @@ export interface Database {
       reserve_sms: { Args: { p_firm: Uuid }; Returns: boolean };
       release_sms: { Args: { p_firm: Uuid; p_month: string }; Returns: undefined };
       sms_month: { Args: Record<string, never>; Returns: string };
+      verify_signup_email_code: {
+        Args: { p_email: string; p_code_hash: string };
+        Returns: "ok" | "wrong" | "expired" | "locked" | "missing";
+      };
+      create_signup_firm: {
+        Args: {
+          p_profile: Uuid;
+          p_firm_name: string;
+          p_firm_slug: string;
+          p_attorney_name: string;
+          p_attorney_slug: string;
+          p_ibp_roll_no: string;
+          p_admitted_year: number;
+          p_signer_is_attorney: boolean;
+        };
+        Returns: Uuid;
+      };
+      firm_setup_status: {
+        Args: { p_firm: Uuid };
+        Returns: { attorney_ready: boolean; consult_ready: boolean; hours_ready: boolean; contact_ready: boolean }[];
+      };
+      request_firm_review: { Args: Record<string, never>; Returns: "requested" | "incomplete" | "not_pending" | "forbidden" };
       search_conflict_parties: {
         Args: { p_query: string };
         Returns: { id: Uuid; name: string; matter: string; attorney_id: Uuid | null; similarity: number }[];

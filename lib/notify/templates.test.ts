@@ -120,3 +120,12 @@ describe("reminder emails", () => {
     expect(email.text).toContain("keep getting email reminders");
   });
 });
+
+describe("signup code email", () => {
+  it("shows the code under the platform's name", () => {
+    const email = renderEmail("signup_email_code", { code: "482913", minutes: 10, firmName: "Santos Law" }, { ...ctx, firmName: "Consult Booking" });
+    expect(email.subject).toBe("482913 is your code to sign up your firm");
+    expect(email.text).toMatch(/^482913$/m);
+    expect(email.text).toContain("create Santos Law's account");
+  });
+});

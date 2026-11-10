@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end browser tests against a production build and the LOCAL Supabase stack.
 #
-#   tests/e2e/run.sh [all|booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders]
+#   tests/e2e/run.sh [all|booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders|signup]
 #
 # Needs Docker with `npx supabase start` running, and Playwright's browser installed once:
 #   npx playwright install chromium
@@ -81,11 +81,11 @@ run() { echo "=== $1"; node "$E2E/$1.e2e.mjs" || RC=1; }
 # The booking suite books David Okafor's first open time; run it before payments, which
 # expects the sample firm's other attorneys to still have open times.
 case "$SUITE" in
-  all) run booking; run payments; run staff-auth; run portal; run staff-dashboard; run firm-settings; run notifications; run reminders ;;
-  booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders) run "$SUITE" ;;
+  all) run booking; run payments; run staff-auth; run portal; run staff-dashboard; run firm-settings; run notifications; run reminders; run signup ;;
+  booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders|signup) run "$SUITE" ;;
   *) echo "Unknown suite: $SUITE"; exit 2 ;;
 esac
 
 echo "--- server log (app lines)"
-grep -iE "\[payments\]|\[booking\]|\[portal\]|\[staff\]|\[firm\]|\[invite\]|\[notify\]""${TMPDIR:-/tmp}/e2e-next.log" | head -20
+grep -iE "\[payments\]|\[booking\]|\[portal\]|\[staff\]|\[firm\]|\[invite\]|\[notify\]|\[signup\]" "${TMPDIR:-/tmp}/e2e-next.log" | head -20
 exit $RC
