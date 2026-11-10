@@ -129,3 +129,32 @@ describe("signup code email", () => {
     expect(email.text).toContain("create Santos Law's account");
   });
 });
+
+describe("platform emails", () => {
+  const platform = { ...ctx, senderName: "Consult Booking" };
+
+  it("come from the platform, about the firm", () => {
+    const email = renderEmail("platform_firm_approved", { slug: "harlow-reyes" }, platform);
+    expect(email.subject).toBe("Harlow & Reyes's booking page is live");
+    expect(email.html).toContain(">Consult Booking</div>");
+    expect(email.text).toContain("https://app.example/f/harlow-reyes");
+    expect(email.text).toContain("manage Harlow & Reyes on Consult Booking");
+  });
+
+  it("pass the operator's note to the firm, escaped", () => {
+    const email = renderEmail("platform_firm_sent_back", { note: "Roll No. <12345> doesn't match." }, platform);
+    expect(email.text).toContain("Roll No. <12345> doesn't match.");
+    expect(email.html).toContain("Roll No. &lt;12345&gt; doesn&#39;t match.");
+  });
+
+  it("say whether a reinstated firm is live again", () => {
+    expect(renderEmail("platform_firm_reinstated", { slug: "hr", live: true }, platform).subject).toContain("back online");
+    expect(renderEmail("platform_firm_reinstated", { slug: "hr", live: false }, platform).text).toContain("ask to go live");
+  });
+
+  it("link operators to the firm's review page", () => {
+    const email = renderEmail("platform_review_requested", { firmId: "f1", slug: "hr" }, platform);
+    expect(email.text).toContain("https://app.example/admin/firms/f1");
+    expect(renderEmail("platform_attorney_to_check", { firmId: "f1", attorneyName: "Ana" }, platform).subject).toBe("Check a new attorney at Harlow & Reyes");
+  });
+});

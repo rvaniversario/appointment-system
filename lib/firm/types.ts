@@ -46,6 +46,8 @@ export interface AttorneyAdminView {
   bio: string;
   meetingUrl: string;
   isActive: boolean;
+  /** Our operators checked the roll number and year; unchecked attorneys aren't on the booking page. */
+  checked: boolean;
   photoUrl: string | null;
   /** The staff account linked to this profile. */
   memberId: string | null;

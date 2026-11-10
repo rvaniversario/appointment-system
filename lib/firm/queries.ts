@@ -145,7 +145,7 @@ export async function getFirmAttorneys(ctx: StaffContext): Promise<AttorneyAdmin
   const supabase = await createClient();
   const { data } = await supabase
     .from("attorneys")
-    .select("id, slug, full_name, ibp_roll_no, admitted_year, practice_areas, languages, office_id, bio, meeting_url, is_active, photo_path, profile_id")
+    .select("id, slug, full_name, ibp_roll_no, admitted_year, practice_areas, languages, office_id, bio, meeting_url, is_active, photo_path, profile_id, ibp_checked_at")
     .eq("firm_id", ctx.firmId)
     .order("full_name");
   const memberIds = (data ?? []).map((a) => a.profile_id).filter((id): id is string => Boolean(id));
@@ -165,6 +165,7 @@ export async function getFirmAttorneys(ctx: StaffContext): Promise<AttorneyAdmin
     bio: a.bio,
     meetingUrl: a.meeting_url ?? "",
     isActive: a.is_active,
+    checked: Boolean(a.ibp_checked_at),
     photoUrl: publicImageUrl("attorney-photos", a.photo_path),
     memberId: a.profile_id,
     memberName: a.profile_id ? (nameOf.get(a.profile_id) ?? null) : null,
@@ -218,21 +219,26 @@ export interface FirmLaunchState {
   slug: string;
   status: "pending" | "active" | "suspended";
   reviewRequested: boolean;
+  /** Why we sent the firm back or suspended it. */
+  note: string | null;
   steps: { attorney: boolean; consult: boolean; hours: boolean; contact: boolean };
 }
 
 /** Whether the firm's booking page is live, and if not, what's left before it can ask for review. */
 export async function getFirmLaunchState(ctx: StaffContext): Promise<FirmLaunchState> {
   const supabase = await createClient();
-  const [{ data: firm }, { data: setup }] = await Promise.all([
+  const [{ data: firm }, { data: setup }, { data: platform }] = await Promise.all([
     supabase.from("firms").select("slug, status, review_requested_at").eq("id", ctx.firmId).single(),
     supabase.rpc("firm_setup_status", { p_firm: ctx.firmId }),
+    // Our record of the firm is service-role only; the firm sees just the note meant for it.
+    createAdminClient().from("firm_platform").select("firm_note").eq("firm_id", ctx.firmId).maybeSingle(),
   ]);
   const s = setup?.[0];
   return {
     slug: firm?.slug ?? "",
     status: firm?.status ?? "pending",
     reviewRequested: Boolean(firm?.review_requested_at),
+    note: platform?.firm_note ?? null,
     steps: { attorney: Boolean(s?.attorney_ready), consult: Boolean(s?.consult_ready), hours: Boolean(s?.hours_ready), contact: Boolean(s?.contact_ready) },
   };
 }

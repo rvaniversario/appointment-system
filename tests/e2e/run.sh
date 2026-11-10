@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end browser tests against a production build and the LOCAL Supabase stack.
 #
-#   tests/e2e/run.sh [all|booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders|signup]
+#   tests/e2e/run.sh [all|booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders|signup|admin]
 #
 # Needs Docker with `npx supabase start` running, and Playwright's browser installed once:
 #   npx playwright install chromium
@@ -48,7 +48,7 @@ npx supabase db reset --local 2>&1 | grep -q "Finished supabase db reset" || { e
 # A solo firm without PayMongo, to check the one-attorney redirect and that paid types are blocked.
 docker exec -i supabase_db_online-appointment-system psql -q -U postgres -d postgres -c "
   insert into firms (id, slug, name, status) values ('00000000-0000-4000-c000-0000000000e2', 'solo-e2e', 'Solo E2E Law', 'active');
-  insert into attorneys (firm_id, slug, full_name) values ('00000000-0000-4000-c000-0000000000e2', 'lone-attorney', 'Lone Attorney');
+  insert into attorneys (firm_id, slug, full_name, ibp_checked_at) values ('00000000-0000-4000-c000-0000000000e2', 'lone-attorney', 'Lone Attorney', now());
   insert into consult_types (firm_id, slug, label, mode, duration_minutes, price_centavos) values
     ('00000000-0000-4000-c000-0000000000e2', 'free', 'Free Call', 'phone', 15, 0),
     ('00000000-0000-4000-c000-0000000000e2', 'paid', 'Paid Consult', 'video', 30, 100000);"
@@ -62,6 +62,8 @@ pw() { sed -n 's/.*share securely): //p'; }
 export PARTNER_PW=$(node scripts/create-staff-user.mjs --firm harlow-reyes --email partner@harlow.test --role partner --first Pat --last Partner | pw)
 export ADMIN_PW=$(node scripts/create-staff-user.mjs --firm ui-firm --firm-name "UI Firm" --email admin@ui.test --role admin --first Ana --last Cruz | pw)
 export ATTY_PW=$(node scripts/create-staff-user.mjs --firm ui-firm --email attorney@ui.test --role attorney | pw)
+# Our operator exists from the start, so the signup suite's review request emails them.
+export OPERATOR_PW=$(node scripts/create-platform-admin.mjs --email ops@platform.test --first Olive --last Operator | pw)
 export CLIENT_PW="Client-Pass-123456"
 node -e "
   const { createClient } = require('@supabase/supabase-js');
@@ -79,13 +81,15 @@ for _ in $(seq 1 30); do curl -s -o /dev/null http://localhost:3100/ && break; s
 RC=0
 run() { echo "=== $1"; node "$E2E/$1.e2e.mjs" || RC=1; }
 # The booking suite books David Okafor's first open time; run it before payments, which
-# expects the sample firm's other attorneys to still have open times.
+# expects the sample firm's other attorneys to still have open times. The admin suite reviews
+# the firm the signup suite creates, so it runs after it.
 case "$SUITE" in
-  all) run booking; run payments; run staff-auth; run portal; run staff-dashboard; run firm-settings; run notifications; run reminders; run signup ;;
+  all) run booking; run payments; run staff-auth; run portal; run staff-dashboard; run firm-settings; run notifications; run reminders; run signup; run admin ;;
+  admin) run signup; run admin ;;
   booking|payments|staff-auth|portal|staff-dashboard|firm-settings|notifications|reminders|signup) run "$SUITE" ;;
   *) echo "Unknown suite: $SUITE"; exit 2 ;;
 esac
 
 echo "--- server log (app lines)"
-grep -iE "\[payments\]|\[booking\]|\[portal\]|\[staff\]|\[firm\]|\[invite\]|\[notify\]|\[signup\]" "${TMPDIR:-/tmp}/e2e-next.log" | head -20
+grep -iE "\[payments\]|\[booking\]|\[portal\]|\[staff\]|\[firm\]|\[invite\]|\[notify\]|\[signup\]|\[admin\]" "${TMPDIR:-/tmp}/e2e-next.log" | head -20
 exit $RC

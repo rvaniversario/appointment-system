@@ -32,7 +32,9 @@ export default async function FirmAttorneysPage() {
                   {a.practiceAreas.join(", ") || "No practice areas"} · {a.memberName ? `Signs in as ${a.memberName}` : "No staff account linked"}
                 </span>
               </span>
-              <span style={badge(a.isActive ? "green" : "grey")}>{a.isActive ? "Listed" : "Hidden"}</span>
+              <span style={badge(!a.isActive ? "grey" : a.checked ? "green" : "amber")}>
+                {!a.isActive ? "Hidden" : a.checked ? "Listed" : a.ibpRollNo && a.admittedYear ? "Waiting for our check" : "Needs roll number"}
+              </span>
             </Link>
           ))}
         </div>

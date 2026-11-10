@@ -343,6 +343,37 @@ Decisions (2026-11-10):
     Firms created but never set up stay pending until an operator removes them.
   - No per-IP rate limit on the signup form yet (Phase 9).
 
+7b decisions (2026-11-10):
+- An attorney is on the booking page only after an operator checks their roll number and year.
+  New attorneys at live firms, and attorneys whose name, roll number or year changes, wait for a
+  check. Attorneys at firms already live when 7b shipped count as checked.
+- A comp is a flag, an optional end date and an internal note. It does nothing until Phase 8.
+
+7b details (done):
+- Operators are `platform_admins` (added with `npm run admin:create`) with a two-factor session;
+  `is_platform_admin()` checks both. They sign in at `/admin/login` separately from staff.
+- Every operator action is a database function (`admin_set_attorney_check()`,
+  `admin_firm_action()` for approve / send back / suspend / reinstate, `admin_set_comp()`)
+  that checks `is_platform_admin()` and writes `audit_log` as `platform.*`.
+- `firm_platform` holds our own record of each firm (comp, the note last sent to the firm,
+  when it was approved). It's service-role only, because `firms` is public for live firms.
+- `attorneys.ibp_checked_at` and `ibp_checked_by` are set only by operators (a trigger keeps
+  firm staff from setting them and clears them when the name, roll number or year changes).
+  `attorneys_read` shows visitors only checked attorneys. Reassigning a booking needs a
+  checked attorney too.
+- Approving needs the setup checklist done and an active checked attorney. Sending back and
+  suspending need a note, which the firm sees on its dashboard and by email. Reinstating a firm
+  that was never approved returns it to pending.
+- Emails about decisions, review requests and attorneys to check are `platform_*` templates,
+  sent under the platform's name with no firm reply-to.
+- The operator area reads firm-level data with the service role after `requireOperator()`;
+  it never selects bookings, intakes, messages, documents or payments, and shows only the audit
+  entries about signup, review and operator actions.
+- Carried forward from 7b:
+  - Removing abandoned pending firms is still done by hand in SQL.
+  - Operators check the Roll of Attorneys by hand; there's no API for it.
+  - Clients with bookings at a suspended firm aren't told; their bookings stay as they were.
+
 ## Phase 8: Subscriptions
 - Tables: `plans` (price, attorney limit, monthly SMS allowance) and `firm_subscriptions` (status,
   period end, PayMongo ids).

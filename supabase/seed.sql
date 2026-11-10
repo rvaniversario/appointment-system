@@ -55,3 +55,6 @@ insert into public.conflict_parties (firm_id, name, matter, attorney_id) values
   ('00000000-0000-4000-c000-000000000001', 'Daniel Ortiz', 'Ortiz Family — settlement of estate', '00000000-0000-4000-b000-000000000005'),
   ('00000000-0000-4000-c000-000000000001', 'Priya Nair', 'Nair v. Reilly Construction — civil claim', '00000000-0000-4000-b000-000000000006'),
   ('00000000-0000-4000-c000-000000000001', 'Kevin Park', 'People v. Park — criminal defense', '00000000-0000-4000-b000-000000000002');
+
+-- The sample firm is live, so its attorneys' roll numbers count as checked.
+update public.attorneys set ibp_checked_at = now() where firm_id = '00000000-0000-4000-c000-000000000001';

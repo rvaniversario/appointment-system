@@ -15,6 +15,7 @@
     "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --linked > lib/supabase/database.types.ts",
     "staff:create": "node --env-file=.env.local scripts/create-staff-user.mjs",
+    "admin:create": "node --env-file=.env.local scripts/create-platform-admin.mjs",
     "paymongo:link": "node --env-file=.env.local scripts/paymongo-link-firm.mjs"
   },
   "dependencies": {

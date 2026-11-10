@@ -8,6 +8,7 @@ import { createServerClient } from "@supabase/ssr";
  */
 const PUBLIC_PORTAL = ["/portal/login", "/portal/verify", "/portal/email-changed"];
 const PUBLIC_STAFF = ["/staff/login"];
+const PUBLIC_ADMIN = ["/admin/login"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -49,11 +50,12 @@ export async function proxy(request: NextRequest) {
     if (pathname.startsWith("/staff") && !PUBLIC_STAFF.includes(pathname) && !pathname.startsWith("/staff/invite/")) {
       return redirectTo("/staff/login");
     }
+    if ((pathname === "/admin" || pathname.startsWith("/admin/")) && !PUBLIC_ADMIN.includes(pathname)) return redirectTo("/admin/login");
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/portal/:path*", "/staff/:path*", "/f/:path*"],
+  matcher: ["/portal/:path*", "/staff/:path*", "/admin/:path*", "/admin", "/f/:path*"],
 };

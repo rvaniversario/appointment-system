@@ -6,6 +6,8 @@ export interface StaffAttorney {
   id: string;
   name: string;
   isActive: boolean;
+  /** Our operators checked the roll number; only checked attorneys take bookings. */
+  checked: boolean;
   practiceAreas: string[];
 }
 

@@ -41,6 +41,14 @@ npm run staff:create -- --firm harlow-reyes --email you@firm.ph --role admin --f
 
 Sign in at `/staff/login`. On first login you're asked to enroll an authenticator app.
 
+To review firms, make yourself an operator (an existing account keeps its password) and sign
+in at `/admin/login`, also with an authenticator app:
+
+```bash
+npm run admin:create -- --email you@example.com --first Jane --last Reyes
+# remove:  --email you@example.com --remove
+```
+
 The seeded firm's booking page is at http://localhost:3000/f/harlow-reyes. Each firm's public
 pages live under `/f/<firm-slug>`, and a firm with one attorney goes straight to their profile.
 
@@ -49,7 +57,7 @@ Run the tests:
 ```bash
 npm test          # unit tests (slot generation, Manila time, webhook signatures)
 npm run db:test   # database tests: firm isolation, conflict checks, payment secrets
-npm run test:e2e  # browser tests: booking, payments (mock PayMongo), staff sign-in, portal, dashboard, firm settings
+npm run test:e2e  # browser tests: booking, payments (mock PayMongo), staff sign-in, portal, dashboard, firm settings, notifications, reminders, signup, admin
 ```
 
 `npm run test:e2e` resets the **local** database, builds the app and serves it on port 3100,
@@ -197,14 +205,41 @@ one), sets up two-factor, and lands in the dashboard.
 A new firm is `pending`: staff can set everything up, but the booking page returns 404. The
 dashboard shows a checklist (an attorney with roll number and year, a consultation type, weekly
 hours, a contact email). When it's done, a partner or admin clicks **Ask to go live**, which
-records `review_requested_at`. A platform admin then checks the roll number against the Supreme
-Court's list of lawyers and makes the firm `active` (the admin area arrives in 7b; until then,
-`update firms set status = 'active' where slug = '<firm>';`).
+records `review_requested_at` and emails our operators. An operator then reviews it in the
+admin area (below).
 
 An email that already has an account (a client of some firm) can sign up once the code proves
 it's theirs; the new password replaces the old one. Someone already on a firm's staff is told
 to sign in instead. Without `RESEND_API_KEY`, `next dev` skips the code; production refuses
 signups.
+
+### Platform admin
+
+Our operators (`platform_admins`, added with `npm run admin:create`) sign in at `/admin/login`
+with a password and an authenticator app. Anyone else who is signed in gets "not found" there.
+The area shows firm-level data only (firm details, staff names and emails, attorneys' roll
+numbers), never a firm's bookings, clients, messages, documents or payments.
+
+- **Firms** lists every firm, the ones waiting for review first, with filters for firms waiting,
+  live firms with attorneys to check, live, setting up and suspended.
+- **A firm's page** shows its setup checklist, its attorneys' names, roll numbers and years to
+  look up on the Supreme Court's Roll of Attorneys, and its history. Operators:
+  - **Mark an attorney as checked.** Only checked attorneys appear on the booking page. A new
+    attorney, or one whose name, roll number or year changes, is hidden until checked, and
+    operators are emailed when a live firm adds one. Attorneys at firms that were live before
+    7b count as checked.
+  - **Approve** a firm once its checklist is done and an attorney is checked. The page goes live
+    and the firm's partners and admins are emailed.
+  - **Send back** with a note: the firm sees the note in its dashboard and by email, and can ask
+    again.
+  - **Suspend** with a reason (the booking page goes offline; staff can still sign in), and
+    **reinstate**. A firm suspended before it was ever approved goes back to waiting for review.
+  - **Comp** a firm, with an optional end date and an internal note. Nothing uses it until
+    subscriptions (Phase 8) treat a comped firm as paid until that date.
+- **Audit log** lists every operator action. Each action runs a database function that checks
+  the operator's two-factor session and writes `audit_log` itself.
+
+Emails about these decisions come from the platform's name, not the firm's.
 
 ## Deploying (Vercel + Supabase)
 
@@ -250,9 +285,10 @@ signups.
 4. In Vercel, import the repo and set the env vars above for Preview (staging project) and
    Production (production project). Use a PayMongo test key on Preview and the live key only on
    Production.
-5. Bootstrap a firm's first admin against production with `npm run staff:create`, using the
-   production env values and `--firm <slug> --firm-name "<name>"`. A fresh production database
-   starts with no firms.
+5. Make yourself an operator against production with `npm run admin:create -- --email <you>`,
+   using the production env values, then sign in at `/admin/login` to review firms that sign up.
+   To set up a firm by hand instead, use `npm run staff:create` with `--firm <slug> --firm-name
+   "<name>"`. A fresh production database starts with no firms.
 
 ## Rollout status
 
@@ -271,12 +307,13 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
   - [x] 6a: Email notifications for bookings, payments, messages and staff invites, with a retrying queue
   - [x] 6b: Supabase Auth email through Resend, an emailed code for guest bookings, email change in the portal
   - [x] 6c: SMS through PhilSMS, 24-hour and 1-hour reminders, per-firm SMS cap
-- [ ] Phase 7: Firm self-service signup + platform admin, in two PRs:
+- [x] Phase 7: Firm self-service signup + platform admin, in two PRs:
   - [x] 7a: Self-service firm signup with an emailed code, a setup checklist, and asking to go live
-  - [ ] 7b: Platform admin: firm list, IBP review and approval, suspend, comp, audit log
+  - [x] 7b: Platform admin: firm list, IBP review and approval, suspend, comp, audit log
 - [ ] Phase 8: Subscriptions (PayMongo recurring billing, plan limits, lapsed-firm handling)
 - [ ] Phase 9: Hardening and launch (CSP, rate limits, error pages, SEO, E2E tests, legal documents)
 
 Everything runs on real data. Firms sign up at `/signup` and manage their settings, staff and
-attorneys in the dashboard. `npm run staff:create` remains for setting up a firm by hand; firms it
-creates are live at once, without review.
+attorneys in the dashboard, and our operators review them at `/admin`. `npm run staff:create`
+remains for setting up a firm by hand; firms it creates are live at once, without review, but
+attorneys added to them still need an operator's check before they're listed.
