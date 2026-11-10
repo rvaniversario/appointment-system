@@ -1,6 +1,8 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { emailConfigured, emailEnv } from "@/lib/env.server";
 import { publicEnv } from "@/lib/env";
+import { PLATFORM } from "@/lib/brand";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueue, keyPart, sendSoon, type QueuedEmail, type QueuedNotification } from "./queue";
 import { ResendError, sendEmail } from "./resend";
@@ -623,4 +625,38 @@ export function notifySmsLimitReached(firmId: string, cap: number, month: string
       }),
     ),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Firm signup codes
+// ---------------------------------------------------------------------------
+
+/**
+ * Emails the code that confirms the address of someone signing up a firm. Sent directly and
+ * under the platform's name, since no firm exists yet (so nothing goes in notification_log,
+ * which belongs to a firm). The code is never logged.
+ */
+export async function sendSignupEmailCode(input: { to: string; code: string; minutes: number; firmName: string; send: number }): Promise<{ sent: boolean }> {
+  if (!emailConfigured()) return { sent: false };
+  const email = renderEmail(
+    "signup_email_code",
+    { code: input.code, minutes: input.minutes, firmName: input.firmName },
+    { firmName: PLATFORM.name, siteUrl: publicEnv.NEXT_PUBLIC_SITE_URL, fromAddress: emailEnv().EMAIL_FROM },
+  );
+  try {
+    await sendEmail({
+      fromName: PLATFORM.name,
+      to: input.to,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+      // Sent once, never retried; the key only has to be unique.
+      idempotencyKey: `signup-code-${keyPart(input.to)}-${input.send}-${randomUUID()}`,
+    });
+    return { sent: true };
+  } catch (error) {
+    const message = error instanceof ResendError ? `${error.status} ${error.message}` : String(error);
+    console.error("[notify] signup code email failed", { message });
+    return { sent: false };
+  }
 }

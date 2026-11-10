@@ -318,6 +318,31 @@ Decisions:
   action is written to `audit_log`.
 - Early firms can be onboarded by hand with a comped status before Phase 8 ships.
 
+Decisions (2026-11-10):
+- Anyone can sign up; the booking page stays hidden until a platform admin approves it.
+- The signer is either the attorney (becomes admin and the linked attorney) or the office
+  manager (becomes admin and names the first attorney).
+- The IBP check is the roll number and year admitted, checked by hand against the Supreme
+  Court's list of lawyers. No ID upload, to keep personal data to a minimum.
+- Two PRs: 7a signup, 7b platform admin.
+
+7a details (done):
+- `/signup` takes the signer, the firm (name and `/f/<slug>`, auto-filled from the name, with
+  reserved words refused) and the first attorney's roll number and year. A 6-digit code is
+  emailed through the Resend API under the platform's name (`signup_email_codes`, hashed,
+  10 minutes, five guesses, one resend a minute, five an hour). Nothing is created before it.
+- `create_signup_firm()` makes the pending firm, the admin membership and the attorney in one
+  transaction and audits it. An existing client account can be used once the code proves it;
+  staff of another firm are refused (one firm per person).
+- Pending firms see a setup checklist (`firm_setup_status()`); `request_firm_review()` lets a
+  partner or admin with two-factor ask to go live once it's complete. Firms still can't change
+  their own status.
+- Fixed along the way: the e2e runner's server-log filter never read the log (missing space).
+- Carried forward from 7a:
+  - Unfinished signups (code sent, never entered) leave only a code row; nothing to clean up.
+    Firms created but never set up stay pending until an operator removes them.
+  - No per-IP rate limit on the signup form yet (Phase 9).
+
 ## Phase 8: Subscriptions
 - Tables: `plans` (price, attorney limit, monthly SMS allowance) and `firm_subscriptions` (status,
   period end, PayMongo ids).

@@ -185,6 +185,27 @@ the firm's partners and admins get one email that month. Partners and admins see
 under **Staff → Firm**. Until plans arrive in Phase 8, an operator changes a firm's cap in SQL:
 `update firms set sms_monthly_cap = 500 where slug = '<firm>';`.
 
+### Firm signup
+
+Anyone can sign up a firm at `/signup`: their name, email and password, the firm's name and
+booking page address (`/f/<slug>`), whether they're the attorney or the office manager, and the
+first attorney's roll number and year admitted. We email a 6-digit code to confirm the address
+(our own code through the Resend API, like guest booking codes), and nothing is created until
+it's entered. Then the signer becomes the firm's admin (and its linked attorney, if they are
+one), sets up two-factor, and lands in the dashboard.
+
+A new firm is `pending`: staff can set everything up, but the booking page returns 404. The
+dashboard shows a checklist (an attorney with roll number and year, a consultation type, weekly
+hours, a contact email). When it's done, a partner or admin clicks **Ask to go live**, which
+records `review_requested_at`. A platform admin then checks the roll number against the Supreme
+Court's list of lawyers and makes the firm `active` (the admin area arrives in 7b; until then,
+`update firms set status = 'active' where slug = '<firm>';`).
+
+An email that already has an account (a client of some firm) can sign up once the code proves
+it's theirs; the new password replaces the old one. Someone already on a firm's staff is told
+to sign in instead. Without `RESEND_API_KEY`, `next dev` skips the code; production refuses
+signups.
+
 ## Deploying (Vercel + Supabase)
 
 1. Create **two Supabase projects**, staging and production. Enable PITR backups on production.
@@ -250,9 +271,12 @@ for each firm. Details are in [docs/saas-plan.md](docs/saas-plan.md).
   - [x] 6a: Email notifications for bookings, payments, messages and staff invites, with a retrying queue
   - [x] 6b: Supabase Auth email through Resend, an emailed code for guest bookings, email change in the portal
   - [x] 6c: SMS through PhilSMS, 24-hour and 1-hour reminders, per-firm SMS cap
-- [ ] Phase 7: Firm self-service signup + platform admin
+- [ ] Phase 7: Firm self-service signup + platform admin, in two PRs:
+  - [x] 7a: Self-service firm signup with an emailed code, a setup checklist, and asking to go live
+  - [ ] 7b: Platform admin: firm list, IBP review and approval, suspend, comp, audit log
 - [ ] Phase 8: Subscriptions (PayMongo recurring billing, plan limits, lapsed-firm handling)
 - [ ] Phase 9: Hardening and launch (CSP, rate limits, error pages, SEO, E2E tests, legal documents)
 
-Everything runs on real data. Firms manage their settings, staff and attorneys in the dashboard;
-`npm run staff:create` is only for creating a new firm's first admin until self-service signup (Phase 7).
+Everything runs on real data. Firms sign up at `/signup` and manage their settings, staff and
+attorneys in the dashboard. `npm run staff:create` remains for setting up a firm by hand; firms it
+creates are live at once, without review.

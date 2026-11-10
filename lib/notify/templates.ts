@@ -46,6 +46,8 @@ export interface TemplatePayloads {
   staff_sms_limit_reached: { cap: number; month: string };
   // To a visitor booking without signing in. Sent directly, never queued, because it holds a secret.
   booking_email_code: { code: string; minutes: number };
+  // To someone signing up a firm. Sent directly, never queued, for the same reason.
+  signup_email_code: { code: string; minutes: number; firmName: string };
 }
 
 export type TemplateName = keyof TemplatePayloads;
@@ -443,6 +445,17 @@ const builders: Builders = {
       `The code expires in ${p.minutes} minutes. If you didn't try to book a consultation, you can ignore this email. Nothing is booked without the code.`,
     ],
     footer: `Someone entered this address on ${ctx.firmName}'s booking page.`,
+  }),
+
+  // ctx.firmName is the platform's name here: no firm exists yet.
+  signup_email_code: (p, ctx) => ({
+    audience: "staff",
+    subject: `${p.code} is your code to sign up your firm`,
+    heading: "Confirm your email",
+    paragraphs: [`Enter this code on the ${ctx.firmName} signup page to confirm your email and create ${p.firmName}'s account:`],
+    code: p.code,
+    after: [`The code expires in ${p.minutes} minutes. If you didn't sign up a firm, you can ignore this email. Nothing is created without the code.`],
+    footer: `Someone entered this address on the ${ctx.firmName} signup page.`,
   }),
 };
 

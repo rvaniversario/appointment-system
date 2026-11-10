@@ -531,3 +531,19 @@ export async function removeMember(input: { profileId: string }): Promise<FirmRe
   refresh();
   return { ok: true };
 }
+
+/** A partner or admin of a pending firm asks for its booking page to go live. */
+export async function requestFirmReview(): Promise<FirmResult> {
+  const ctx = await getStaffContext();
+  if (!ctx.isManager) return fail("Only partners and admins can do this.");
+  const { data, error } = await (await createClient()).rpc("request_firm_review");
+  if (error) {
+    console.error("[firm] review request failed", { code: error.code, message: error.message });
+    return fail("Something went wrong. Please try again.");
+  }
+  if (data === "incomplete") return fail("Finish the steps above first.");
+  if (data === "not_pending") return fail("Your booking page is already live.");
+  if (data !== "requested") return fail("Only partners and admins can do this.");
+  refresh();
+  return { ok: true };
+}

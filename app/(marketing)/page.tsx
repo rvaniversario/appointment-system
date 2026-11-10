@@ -67,6 +67,20 @@ export default function Home() {
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Link
+          href="/signup"
+          style={{
+            padding: "12px 20px",
+            borderRadius: 8,
+            background: "oklch(0.5 0.08 150)",
+            color: "#fff",
+            fontSize: 15,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          Sign up your firm
+        </Link>
+        <Link
           href="/staff/login"
           style={{
             padding: "12px 20px",

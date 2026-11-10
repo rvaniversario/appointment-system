@@ -213,3 +213,26 @@ export async function getSmsUsage(ctx: StaffContext): Promise<{ sent: number; ca
   ]);
   return { sent: usage?.sent ?? 0, cap: firm?.sms_monthly_cap ?? 0 };
 }
+
+export interface FirmLaunchState {
+  slug: string;
+  status: "pending" | "active" | "suspended";
+  reviewRequested: boolean;
+  steps: { attorney: boolean; consult: boolean; hours: boolean; contact: boolean };
+}
+
+/** Whether the firm's booking page is live, and if not, what's left before it can ask for review. */
+export async function getFirmLaunchState(ctx: StaffContext): Promise<FirmLaunchState> {
+  const supabase = await createClient();
+  const [{ data: firm }, { data: setup }] = await Promise.all([
+    supabase.from("firms").select("slug, status, review_requested_at").eq("id", ctx.firmId).single(),
+    supabase.rpc("firm_setup_status", { p_firm: ctx.firmId }),
+  ]);
+  const s = setup?.[0];
+  return {
+    slug: firm?.slug ?? "",
+    status: firm?.status ?? "pending",
+    reviewRequested: Boolean(firm?.review_requested_at),
+    steps: { attorney: Boolean(s?.attorney_ready), consult: Boolean(s?.consult_ready), hours: Boolean(s?.hours_ready), contact: Boolean(s?.contact_ready) },
+  };
+}
