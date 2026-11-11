@@ -660,3 +660,84 @@ export async function sendSignupEmailCode(input: { to: string; code: string; min
     return { sent: false };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Platform review (sent under the platform's name)
+// ---------------------------------------------------------------------------
+
+async function operatorEmails(admin: Admin): Promise<string[]> {
+  const { data } = await admin.from("platform_admins").select("profile_id");
+  return emailsOf(admin, (data ?? []).map((o) => o.profile_id));
+}
+
+export type FirmDecision =
+  | { kind: "approved"; slug: string }
+  | { kind: "sent_back"; note: string }
+  | { kind: "suspended"; note: string }
+  | { kind: "reinstated"; slug: string; live: boolean };
+
+function decisionEmail(firmId: string, to: string, stamp: number, d: FirmDecision): QueuedEmail {
+  const common = { firmId, recipient: to };
+  switch (d.kind) {
+    case "approved":
+      return { ...common, template: "platform_firm_approved", dedupeKey: `platform_firm_approved:${firmId}:${stamp}:${to}`, payload: { slug: d.slug } };
+    case "sent_back":
+      return { ...common, template: "platform_firm_sent_back", dedupeKey: `platform_firm_sent_back:${firmId}:${stamp}:${to}`, payload: { note: d.note } };
+    case "suspended":
+      return { ...common, template: "platform_firm_suspended", dedupeKey: `platform_firm_suspended:${firmId}:${stamp}:${to}`, payload: { note: d.note } };
+    case "reinstated":
+      return { ...common, template: "platform_firm_reinstated", dedupeKey: `platform_firm_reinstated:${firmId}:${stamp}:${to}`, payload: { slug: d.slug, live: d.live } };
+  }
+}
+
+/** Tells a firm's partners and admins what an operator decided. */
+export function notifyFirmDecision(firmId: string, decision: FirmDecision) {
+  return run("firm decision", async (admin) => {
+    const stamp = Date.now();
+    return (await managerEmails(admin, firmId)).map((to) => decisionEmail(firmId, to, stamp, decision));
+  });
+}
+
+/** Tells operators that a firm asked to go live. */
+export function notifyReviewRequested(firmId: string) {
+  return run("review request", async (admin) => {
+    const { data: firm } = await admin.from("firms").select("slug, review_requested_at").eq("id", firmId).maybeSingle();
+    if (!firm?.review_requested_at) return [];
+    return (await operatorEmails(admin)).map(
+      (to): QueuedEmail => ({
+        firmId,
+        template: "platform_review_requested",
+        recipient: to,
+        dedupeKey: `platform_review_requested:${firmId}:${firm.review_requested_at}:${to}`,
+        payload: { firmId, slug: firm.slug },
+      }),
+    );
+  });
+}
+
+/**
+ * Tells operators that a live firm added or changed an attorney who now needs a check.
+ * Pending firms are checked during their review instead.
+ */
+export function notifyAttorneyToCheck(attorneyId: string) {
+  return run("attorney check", async (admin) => {
+    const { data: a } = await admin
+      .from("attorneys")
+      .select("firm_id, full_name, ibp_roll_no, admitted_year, is_active, ibp_checked_at")
+      .eq("id", attorneyId)
+      .maybeSingle();
+    if (!a || !a.is_active || a.ibp_checked_at || !a.ibp_roll_no || !a.admitted_year) return [];
+    const { data: firm } = await admin.from("firms").select("status").eq("id", a.firm_id).maybeSingle();
+    if (firm?.status !== "active") return [];
+    const version = keyPart(`${a.full_name}|${a.ibp_roll_no}|${a.admitted_year}`);
+    return (await operatorEmails(admin)).map(
+      (to): QueuedEmail => ({
+        firmId: a.firm_id,
+        template: "platform_attorney_to_check",
+        recipient: to,
+        dedupeKey: `platform_attorney_to_check:${attorneyId}:${version}:${to}`,
+        payload: { firmId: a.firm_id, attorneyName: a.full_name },
+      }),
+    );
+  });
+}

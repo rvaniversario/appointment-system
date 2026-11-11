@@ -18,6 +18,7 @@ const blank: AttorneyAdminView = {
   bio: "",
   meetingUrl: "",
   isActive: true,
+  checked: false,
   photoUrl: null,
   memberId: null,
   memberName: null,
@@ -107,6 +108,13 @@ export function AttorneyForm({
               </select>
             </Labeled>
           </div>
+          {!selfOnly && (
+            <p id="ibp-check-note" style={{ fontSize: 13, color: "oklch(0.5 0.01 258)", margin: "-4px 0 0", lineHeight: 1.5 }}>
+              {attorney.checked
+                ? "We've checked this roll number. Changing the name, roll number or year takes the attorney off your booking page until we check it again."
+                : "This attorney isn't on your booking page until we check the roll number and year admitted against the Supreme Court's Roll of Attorneys."}
+            </p>
+          )}
           <Labeled label="Practice areas" hint="Separate with commas, e.g. Family Law, Immigration. Clients filter the directory by these.">
             <input value={practiceAreas} onChange={(e) => setPracticeAreas(e.target.value)} style={field} />
           </Labeled>

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { publicEnv } from "@/lib/env";
 import { getStaffContext, type StaffContext } from "@/lib/staff/queries";
-import { sendInviteEmail } from "@/lib/notify/events";
+import { notifyAttorneyToCheck, notifyReviewRequested, sendInviteEmail } from "@/lib/notify/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FirmRole, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -316,6 +316,7 @@ export async function saveAttorney(input: z.input<typeof attorneySchema>): Promi
     return fail(GENERIC);
   }
   await audit(ctx, a.id ? "attorney.updated" : "attorney.added", "attorneys", data.id, { name: a.fullName, active: a.isActive });
+  await notifyAttorneyToCheck(data.id);
   revalidatePath("/", "layout");
   return { ok: true, id: data.id };
 }
@@ -544,6 +545,7 @@ export async function requestFirmReview(): Promise<FirmResult> {
   if (data === "incomplete") return fail("Finish the steps above first.");
   if (data === "not_pending") return fail("Your booking page is already live.");
   if (data !== "requested") return fail("Only partners and admins can do this.");
+  await notifyReviewRequested(ctx.firmId);
   refresh();
   return { ok: true };
 }

@@ -75,8 +75,8 @@ const [attOne, attTwo] = await must(
   db
     .from("attorneys")
     .insert([
-      { firm_id: firm.id, profile_id: one.id, slug: "olivia-one", full_name: "Olivia One", meeting_url: "https://meet.example/one", practice_areas: ["Family Law"] },
-      { firm_id: firm.id, profile_id: two.id, slug: "tomas-two", full_name: "Tomas Two", meeting_url: "https://meet.example/two", practice_areas: ["Family Law"] },
+      { firm_id: firm.id, profile_id: one.id, slug: "olivia-one", full_name: "Olivia One", meeting_url: "https://meet.example/one", practice_areas: ["Family Law"], ibp_checked_at: new Date().toISOString() },
+      { firm_id: firm.id, profile_id: two.id, slug: "tomas-two", full_name: "Tomas Two", meeting_url: "https://meet.example/two", practice_areas: ["Family Law"], ibp_checked_at: new Date().toISOString() },
     ])
     .select("id"),
 );

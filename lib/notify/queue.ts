@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { after } from "next/server";
 import { emailConfigured, emailEnv, smsConfigured } from "@/lib/env.server";
 import { publicEnv } from "@/lib/env";
+import { PLATFORM } from "@/lib/brand";
 import { manilaDate } from "@/lib/booking/time";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -193,14 +194,17 @@ export async function processQueue(limit = 20): Promise<ProcessResult> {
 
 async function deliverEmail(row: Row, firm: Firm): Promise<string> {
   const template = row.template as TemplateName;
+  // Platform emails come from us, not the firm, and replies don't go to the firm.
+  const platform = template.startsWith("platform_");
   const email = renderEmail(template, row.payload as never, {
     firmName: firm.name,
     siteUrl: publicEnv.NEXT_PUBLIC_SITE_URL,
     fromAddress: emailEnv().EMAIL_FROM,
+    senderName: platform ? PLATFORM.name : undefined,
   });
-  const isClientEmail = !template.startsWith("staff_");
+  const isClientEmail = !template.startsWith("staff_") && !platform;
   const { id } = await sendEmail({
-    fromName: firm.name,
+    fromName: platform ? PLATFORM.name : firm.name,
     to: row.recipient,
     replyTo: isClientEmail ? firm.contact_email : null,
     subject: email.subject,

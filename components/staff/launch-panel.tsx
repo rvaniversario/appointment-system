@@ -31,6 +31,11 @@ export function LaunchPanel({ state, isManager }: { state: FirmLaunchState; isMa
       <div role="status" id="launch-panel" style={{ ...box, background: "oklch(0.97 0.02 25)", borderColor: "oklch(0.85 0.06 25)" }}>
         <strong>Your booking page is offline.</strong> The firm&apos;s account is suspended, so clients can&apos;t book. Contact
         support to restore it.
+        {state.note && (
+          <p data-testid="launch-note" style={{ margin: "8px 0 0", fontSize: 13.5 }}>
+            Reason: {state.note}
+          </p>
+        )}
       </div>
     );
   }
@@ -50,6 +55,15 @@ export function LaunchPanel({ state, isManager }: { state: FirmLaunchState; isMa
           ? " goes live once that's done. You can keep editing your settings in the meantime."
           : " yet. Finish these steps, then ask us to review it."}
       </p>
+      {!state.reviewRequested && state.note && (
+        <p
+          data-testid="launch-note"
+          role="status"
+          style={{ fontSize: 13.5, lineHeight: 1.55, margin: "0 0 12px", padding: "8px 10px", background: "#fff", border: "1px solid oklch(0.88 0.05 85)", borderRadius: 8 }}
+        >
+          <strong>We couldn&apos;t approve it yet:</strong> {state.note} Make the change, then ask again.
+        </p>
+      )}
       <ul style={{ listStyle: "none", padding: 0, margin: "0 0 14px", display: "flex", flexDirection: "column", gap: 6 }}>
         {STEPS.map((s) => (
           <li key={s.key} data-step={s.key} data-done={state.steps[s.key]} style={{ fontSize: 14, display: "flex", gap: 8 }}>

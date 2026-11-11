@@ -31,8 +31,8 @@ const at = (ms) => new Date(Date.now() + ms).toISOString();
 
 // A firm with one attorney, a manager and two clients: Rosa agrees to texts, Tomas doesn't.
 const [firm] = await must(db.from("firms").insert({ slug: "remind-e2e", name: "Remind E2E Law", status: "active", contact_email: "desk@remind.test" }).select("id"));
-const [attorney] = await must(db.from("attorneys").insert({ firm_id: firm.id, slug: "rhea-remind", full_name: "Rhea Remind" }).select("id"));
-const [attorney2] = await must(db.from("attorneys").insert({ firm_id: firm.id, slug: "otto-other", full_name: "Otto Other" }).select("id"));
+const [attorney] = await must(db.from("attorneys").insert({ firm_id: firm.id, slug: "rhea-remind", full_name: "Rhea Remind", ibp_checked_at: new Date().toISOString() }).select("id"));
+const [attorney2] = await must(db.from("attorneys").insert({ firm_id: firm.id, slug: "otto-other", full_name: "Otto Other", ibp_checked_at: new Date().toISOString() }).select("id"));
 const [consult] = await must(db.from("consult_types").insert({ firm_id: firm.id, slug: "phone", label: "Phone Consultation", mode: "phone", duration_minutes: 30 }).select("id"));
 const user = async (email) => (await db.auth.admin.createUser({ email, email_confirm: true })).data.user.id;
 const manager = await user("manager@remind.test");

@@ -53,7 +53,7 @@ export const getStaffContext = cache(async (): Promise<StaffContext> => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("attorneys")
-    .select("id, full_name, is_active, practice_areas, profile_id")
+    .select("id, full_name, is_active, practice_areas, profile_id, ibp_checked_at")
     .eq("firm_id", firmId)
     .order("full_name");
   const rows = data ?? [];
@@ -62,7 +62,7 @@ export const getStaffContext = cache(async (): Promise<StaffContext> => {
     firmId,
     isManager: isManagerRole(account.role),
     attorneyId: rows.find((a) => a.profile_id === account.id)?.id ?? null,
-    attorneys: rows.map((a) => ({ id: a.id, name: a.full_name, isActive: a.is_active, practiceAreas: a.practice_areas })),
+    attorneys: rows.map((a) => ({ id: a.id, name: a.full_name, isActive: a.is_active, checked: Boolean(a.ibp_checked_at), practiceAreas: a.practice_areas })),
   };
 });
 
@@ -309,7 +309,7 @@ export async function getAppointmentDetail(ctx: StaffContext, appointmentId: str
       : null,
     payment: payment ? { amountLabel: formatPeso(payment.amount_centavos), status: payment.status } : null,
     reassignOptions: ctx.attorneys
-      .filter((x) => x.isActive && x.id !== a.attorney_id)
+      .filter((x) => x.isActive && x.checked && x.id !== a.attorney_id)
       .map((x) => ({ id: x.id, name: x.name, matchesCaseType: Boolean(caseType) && x.practiceAreas.includes(caseType) }))
       .sort((x, y) => Number(y.matchesCaseType) - Number(x.matchesCaseType) || x.name.localeCompare(y.name)),
   };

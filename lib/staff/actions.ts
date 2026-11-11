@@ -103,6 +103,7 @@ export async function reassignAppointment(input: { appointmentId: string; attorn
   if (appt.status !== "confirmed") return fail("Only confirmed bookings can be reassigned.");
   const target = ctx.attorneys.find((a) => a.id === input.attorneyId && a.isActive);
   if (!target || target.id === appt.attorney_id) return fail("Choose another active attorney.");
+  if (!target.checked) return fail(`We haven't checked ${target.name}'s roll number yet, so they can't take bookings.`);
 
   const supabase = await createClient();
   const [{ data: consult }, { data: attorneys }] = await Promise.all([

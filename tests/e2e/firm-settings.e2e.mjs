@@ -72,7 +72,7 @@ await must(
   ]),
 );
 const [ana] = await must(
-  db.from("attorneys").insert({ firm_id: firm.id, profile_id: atty.id, slug: "ana-atty", full_name: "Ana Atty", ibp_roll_no: "11111" }).select("id"),
+  db.from("attorneys").insert({ firm_id: firm.id, profile_id: atty.id, slug: "ana-atty", full_name: "Ana Atty", ibp_roll_no: "11111", ibp_checked_at: new Date().toISOString() }).select("id"),
 );
 
 const png = join(tmpdir(), "logo.png");
@@ -178,6 +178,17 @@ let existingInviteLink;
   await page.getByText("Attorney added.").waitFor({ timeout: 10000 });
   const [noel] = await must(db.from("attorneys").select("id, slug, practice_areas, office_id").eq("firm_id", firm.id).eq("full_name", "Noel Nuevo"));
   check("a new attorney gets a page address from their name", noel?.slug === "noel-nuevo", noel?.slug);
+  check("the form says a new attorney waits for our check", await page.locator("#ibp-check-note").getByText("isn't on your booking page until we check").isVisible());
+  {
+    const visitor = await browser.newPage();
+    await visitor.goto(`${BASE}/f/settings-e2e`);
+    check("a new attorney stays off the booking page until we check them", (await visitor.getByText("Noel Nuevo").count()) === 0);
+    await visitor.close();
+  }
+  // Our operator checks the roll number (the admin suite does this in the browser). The photo
+  // upload below refreshes the cached public pages.
+  await must(db.from("attorneys").update({ ibp_roll_no: "77777", admitted_year: 2019 }).eq("id", noel.id));
+  await must(db.from("attorneys").update({ ibp_checked_at: new Date().toISOString() }).eq("id", noel.id));
   check("practice areas are saved as a list", noel?.practice_areas.join("|") === "Labor Law|Family Law");
   await page.setInputFiles('input[aria-label="Upload photo"]', png);
   const withPhoto = await eventually(() => must(db.from("attorneys").select("photo_path").eq("id", noel.id).single()), (r) => Boolean(r.photo_path));

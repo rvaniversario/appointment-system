@@ -11,6 +11,8 @@ interface AdminLoginScreenProps {
   onEmailChange: (v: string) => void;
   onPasswordChange: (v: string) => void;
   onSubmit: () => void;
+  title?: string;
+  intro?: string;
 }
 
 export function AdminLoginScreen({
@@ -21,6 +23,8 @@ export function AdminLoginScreen({
   onEmailChange,
   onPasswordChange,
   onSubmit,
+  title = "Staff Login",
+  intro = "For attorneys and firm staff only. Two-factor authentication is required on every login.",
 }: AdminLoginScreenProps) {
   return (
     <div
@@ -42,12 +46,9 @@ export function AdminLoginScreen({
             margin: "0 0 6px",
           }}
         >
-          Staff Login
+          {title}
         </h1>
-        <p style={{ fontSize: 15, color: "oklch(0.5 0.01 258)", margin: "0 0 28px" }}>
-          For attorneys and firm staff only. Two-factor authentication is required on every
-          login.
-        </p>
+        <p style={{ fontSize: 15, color: "oklch(0.5 0.01 258)", margin: "0 0 28px" }}>{intro}</p>
         <form
           onSubmit={(e) => {
             e.preventDefault();

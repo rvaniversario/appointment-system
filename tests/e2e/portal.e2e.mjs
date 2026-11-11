@@ -40,7 +40,7 @@ await must(db.from("profiles").update({ first_name: "Rosa", last_name: "Reyes" }
 const [firm] = await must(db.from("firms").insert({ slug: "portal-e2e", name: "Portal E2E Law", status: "active" }).select("id"));
 await must(db.from("firm_memberships").insert({ profile_id: attorneyUser.id, firm_id: firm.id, role: "attorney" }));
 const [attorney] = await must(
-  db.from("attorneys").insert({ firm_id: firm.id, profile_id: attorneyUser.id, slug: "pat", full_name: "Pat Santos" }).select("id"),
+  db.from("attorneys").insert({ firm_id: firm.id, profile_id: attorneyUser.id, slug: "pat", full_name: "Pat Santos", ibp_checked_at: new Date().toISOString() }).select("id"),
 );
 await must(
   db.from("availability_rules").insert(

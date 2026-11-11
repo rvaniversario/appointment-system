@@ -48,6 +48,13 @@ export interface TemplatePayloads {
   booking_email_code: { code: string; minutes: number };
   // To someone signing up a firm. Sent directly, never queued, for the same reason.
   signup_email_code: { code: string; minutes: number; firmName: string };
+  // Platform emails: sent under the platform's name. ctx.firmName is the firm they're about.
+  platform_firm_approved: { slug: string };
+  platform_firm_sent_back: { note: string };
+  platform_firm_suspended: { note: string };
+  platform_firm_reinstated: { slug: string; live: boolean };
+  platform_review_requested: { firmId: string; slug: string };
+  platform_attorney_to_check: { firmId: string; attorneyName: string };
 }
 
 export type TemplateName = keyof TemplatePayloads;
@@ -58,6 +65,8 @@ export interface RenderContext {
   /** Our sending address, used as the calendar file's organizer. */
   fromAddress: string;
   now?: Date;
+  /** Who the email is from, when that isn't the firm (platform emails). */
+  senderName?: string;
 }
 
 export interface RenderedEmail {
@@ -139,7 +148,7 @@ function toEmail(m: Message, ctx: RenderContext): RenderedEmail {
   const html = [
     `<!doctype html><html><body style="margin:0;padding:24px;background:#f5f4f0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2328;font-size:15px">`,
     `<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;padding:28px">`,
-    `<div style="font-size:13px;color:#6b6f76;margin-bottom:6px">${escapeHtml(ctx.firmName)}</div>`,
+    `<div style="font-size:13px;color:#6b6f76;margin-bottom:6px">${escapeHtml(ctx.senderName ?? ctx.firmName)}</div>`,
     `<h1 style="font-size:20px;margin:0 0 18px;font-weight:600">${escapeHtml(m.heading)}</h1>`,
     m.greeting ? p(m.greeting) : "",
     ...m.paragraphs.map(p),
@@ -457,7 +466,79 @@ const builders: Builders = {
     after: [`The code expires in ${p.minutes} minutes. If you didn't sign up a firm, you can ignore this email. Nothing is created without the code.`],
     footer: `Someone entered this address on the ${ctx.firmName} signup page.`,
   }),
+
+  platform_firm_approved: (p, ctx) => ({
+    audience: "staff",
+    subject: `${ctx.firmName}'s booking page is live`,
+    heading: "Your booking page is live",
+    paragraphs: [
+      `We checked ${ctx.firmName}'s details and approved your booking page. Clients can now book consultations at:`,
+    ],
+    details: [["Booking page", `${ctx.siteUrl}/f/${p.slug}`]],
+    action: { label: "Open your dashboard", href: `${ctx.siteUrl}/staff/calendar` },
+    after: ["Attorneys you add later appear on the page once we've checked their roll number."],
+    footer: platformFooter(ctx),
+  }),
+
+  platform_firm_sent_back: (p, ctx) => ({
+    audience: "staff",
+    subject: `We couldn't approve ${ctx.firmName}'s booking page yet`,
+    heading: "Your booking page needs a change",
+    paragraphs: [`We reviewed ${ctx.firmName}'s booking page but couldn't approve it yet:`, p.note, "Make the change in your dashboard, then ask to go live again."],
+    action: { label: "Open your dashboard", href: `${ctx.siteUrl}/staff/calendar` },
+    footer: platformFooter(ctx),
+  }),
+
+  platform_firm_suspended: (p, ctx) => ({
+    audience: "staff",
+    subject: `${ctx.firmName}'s booking page is offline`,
+    heading: "Your booking page is offline",
+    paragraphs: [
+      `We've suspended ${ctx.firmName}'s account, so clients can't make new bookings:`,
+      p.note,
+      "You can still sign in to see existing bookings. Reply to this email if you think this is a mistake.",
+    ],
+    footer: platformFooter(ctx),
+  }),
+
+  platform_firm_reinstated: (p, ctx) => ({
+    audience: "staff",
+    subject: p.live ? `${ctx.firmName}'s booking page is back online` : `${ctx.firmName}'s account is restored`,
+    heading: p.live ? "Your booking page is back online" : "Your account is restored",
+    paragraphs: [
+      p.live
+        ? `We've restored ${ctx.firmName}'s account. Clients can book again at ${ctx.siteUrl}/f/${p.slug}.`
+        : `We've restored ${ctx.firmName}'s account. Finish setting up and ask to go live when you're ready.`,
+    ],
+    action: { label: "Open your dashboard", href: `${ctx.siteUrl}/staff/calendar` },
+    footer: platformFooter(ctx),
+  }),
+
+  platform_review_requested: (p, ctx) => ({
+    audience: "staff",
+    subject: `${ctx.firmName} asks to go live`,
+    heading: "A firm is waiting for review",
+    paragraphs: [`${ctx.firmName} (/f/${p.slug}) finished setting up and asked to go live. Check its attorneys' roll numbers, then approve it or send it back.`],
+    action: { label: "Review the firm", href: `${ctx.siteUrl}/admin/firms/${p.firmId}` },
+    footer: operatorFooter(ctx),
+  }),
+
+  platform_attorney_to_check: (p, ctx) => ({
+    audience: "staff",
+    subject: `Check a new attorney at ${ctx.firmName}`,
+    heading: "An attorney is waiting for a check",
+    paragraphs: [`${ctx.firmName} added or changed ${p.attorneyName}. They stay off the booking page until you check their roll number and year admitted.`],
+    action: { label: "Review the firm", href: `${ctx.siteUrl}/admin/firms/${p.firmId}` },
+    footer: operatorFooter(ctx),
+  }),
 };
+
+function platformFooter(ctx: RenderContext): string {
+  return `You're receiving this because you manage ${ctx.firmName} on ${ctx.senderName ?? "our platform"}.`;
+}
+function operatorFooter(ctx: RenderContext): string {
+  return `You're receiving this because you're a ${ctx.senderName ?? "platform"} operator.`;
+}
 
 export function renderEmail<K extends TemplateName>(template: K, payload: TemplatePayloads[K], ctx: RenderContext): RenderedEmail {
   return toEmail(builders[template](payload, ctx), ctx);

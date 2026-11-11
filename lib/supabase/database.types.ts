@@ -107,6 +107,8 @@ export interface Database {
           photo_path: string | null;
           meeting_url: string | null;
           is_active: boolean;
+          ibp_checked_at: Ts | null;
+          ibp_checked_by: Uuid | null;
           created_at: Ts;
           updated_at: Ts;
         },
@@ -346,6 +348,18 @@ export interface Database {
         { email: string; code_hash: string; expires_at: Ts; attempts: number; sends: number; last_sent_at: Ts; verified_at: Ts | null; created_at: Ts },
         "email" | "code_hash" | "expires_at"
       >;
+      firm_platform: Table<
+        {
+          firm_id: Uuid;
+          comped: boolean;
+          comped_until: string | null;
+          comp_note: string | null;
+          firm_note: string | null;
+          approved_at: Ts | null;
+          updated_at: Ts;
+        },
+        "firm_id"
+      >;
       audit_log: Table<
         {
           id: number;
@@ -416,6 +430,19 @@ export interface Database {
         Returns: { attorney_ready: boolean; consult_ready: boolean; hours_ready: boolean; contact_ready: boolean }[];
       };
       request_firm_review: { Args: Record<string, never>; Returns: "requested" | "incomplete" | "not_pending" | "forbidden" };
+      is_platform_admin: { Args: Record<string, never>; Returns: boolean };
+      admin_set_attorney_check: {
+        Args: { p_attorney: Uuid; p_checked: boolean };
+        Returns: "ok" | "forbidden" | "missing" | "incomplete";
+      };
+      admin_firm_action: {
+        Args: { p_firm: Uuid; p_action: "approve" | "send_back" | "suspend" | "reinstate"; p_note?: string | null };
+        Returns: "ok" | "forbidden" | "missing" | "wrong_status" | "note_required" | "incomplete" | "no_checked_attorney";
+      };
+      admin_set_comp: {
+        Args: { p_firm: Uuid; p_comped: boolean; p_until?: string | null; p_note?: string | null };
+        Returns: "ok" | "forbidden" | "missing" | "past_date";
+      };
       search_conflict_parties: {
         Args: { p_query: string };
         Returns: { id: Uuid; name: string; matter: string; attorney_id: Uuid | null; similarity: number }[];
